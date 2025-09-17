@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Fundthesis
 
-## Getting Started
+AI-Powered Financial Education Platform  
+By: Ali Benrami and Hasnain Niazi
 
-First, run the development server:
+## Project Description
+
+Fundthesis empowers first-time and seasoned retail investors with real-time news summarizations and AI-powered stock analysis for portfolio diversification. Users gain access to intelligent tools offering live and historical in-depth company insights.
+
+## Project Importance
+
+Fundthesis bridges the gap in financial literacy by simplifying portfolio selection. By unifying market data, sentiment, and model-driven insights, it helps users make informed decisions without juggling multiple information sources. The focus on education and accessibility lowers the barrier to entry in retail investing.
+
+## Tech Stack and Tools
+
+- **Frontend**: TypeScript (React), Next.js (Better-Auth, shadcn/ui)
+- **Backend**: Python (PyTorch, Pandas, NumPy, scikit-learn, XGBoost, Optuna, Joblib, Transformers, Sentence-Transformers, Google-GenerativeAI, LangChain, LlamaIndex, NLTK, TextBlob, TheFuzz, ChromaDB, Surprise)
+- **APIs**: yFinance, Alpha Vantage, Twelve Data, Finnhub, IEX Cloud, NewsAPI, Marketaux, OpenFIGI, Financial Modeling Prep, SEC EDGAR API, Gemini, Cohere, Hugging Face Inference API, Plaid
+- **Database**: PostgreSQL (for financial and user data)
+
+## The AI Element
+
+- **Clustering (unsupervised)**: Segment users and stocks to power personalized guidance
+- **Time-series forecasting**: ARIMA/Prophet with tree-based methods (e.g., XGBoost)
+- **NLP**: Finance-tuned transformers (FinBERT, Sentence-BERT) + vector search for sentiment and summarization
+- **Deep learning**: From MLPs to LSTMs/TabNet for mixed data types and robust risk profiles
+
+## Getting Started (Frontend)
+
+Prerequisite: Node.js and a package manager (npm, yarn, pnpm, or bun). If you use `nvm`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+source ~/.nvm/nvm.sh
+nvm use --lts
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Install dependencies and run the dev server:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# choose one package manager
+npm install
+npm run dev
+# or: yarn && yarn dev
+# or: pnpm install && pnpm dev
+# or: bun install && bun dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open `http://localhost:3000` to view the app.
 
-## Learn More
+## Development Notes
 
-To learn more about Next.js, take a look at the following resources:
+- Update styles in `src/app/globals.css`
+- Tailwind CSS is used for rapid, utility-first styling. See `tailwind.config.js` for customization and refer to `src/app/globals.css` for base styles.
+- App layout and providers in `src/app/layout.tsx`
+- Main page in `src/app/page.tsx`
+- UI components in `src/components/`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Roadmap (Excerpt)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Weeks 2–3: Data collection, cleaning, and storage (stocks + budgeting)
+- Weeks 4–5: Unsupervised clustering (users and stocks) + visualization
+- Weeks 6–7: Predictive modeling (stock scoring, budget forecasting)
+- Weeks 8–9: Frontend integration + RAG assistant (LangChain + vector DB)
+- Weeks 10–11: Final polish, presentation, and demo
 
-## Deploy on Vercel
+## Contributing
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Clone the repo and create a feature branch
+2. Make changes with clear commits and open a PR
+3. Ensure linting passes and add concise documentation where relevant
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+TBD
