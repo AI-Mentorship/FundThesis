@@ -1,0 +1,8 @@
+python-dotenv
+beautifulsoup4
+readability-lxml
+requests
+trafilatura
+newspaper3k
+finnhub-python
+lxml

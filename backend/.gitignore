@@ -1,0 +1,23 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+
+# Virtual environment
+venv/
+env/
+
+# Editor/IDE specific files
+.vscode/
+.idea/
+
+# Log files
+*.log
+
+# Configuration files (if they contain sensitive data)
+config.ini
+.env
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
