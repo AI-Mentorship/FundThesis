@@ -1,5 +1,5 @@
 # This is the improved testing scraping logic
-import backend.webScraper.utils as newImp
+import utils as newImp
 
 newImp.articleToDB("NewsArticles")   # just the db_name
 newImp.quick_dbcheck()

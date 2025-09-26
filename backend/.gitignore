@@ -21,3 +21,8 @@ config.ini
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
