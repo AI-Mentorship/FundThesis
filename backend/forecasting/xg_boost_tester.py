@@ -7,18 +7,17 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import RobustScaler  # ADD THIS LINE
 
 
-def train_test_split(data,perc):#trains with the first perc of the data and tests with the rest
-    data = data.values
-    n = int(len(data)*(1-perc))
-    return data[:n],data[n:]
+def train_test_split(data, perc):  # trains with the first perc of the data and tests with the rest
+    n = int(len(data) * (1 - perc))
+    return data.iloc[:n].copy(), data.iloc[n:].copy()
 
-def xgb_predict(train,test):
 
-    X = train[:,:-1]#ignore the target column or else we get lookahead bias
-    Y = train[:,-1]#we basically say that if the inputs (X) look like this, then the ouput (Y) looks like that
+def xgb_predict(train, test):
+    X = train.iloc[:, :-1].values  # ignore the target column or else we get lookahead bias
+    Y = train.iloc[:, -1].values   # we basically say that if the inputs (X) look like this, then the ouput (Y) looks like that
 
-    X_test = test[:, :-1]
-    y_test = test[:, -1]
+    X_test = test.iloc[:, :-1].values
+    y_test = test.iloc[:, -1].values
 
     model = XGBRegressor(
         n_estimators=400,
@@ -34,32 +33,35 @@ def xgb_predict(train,test):
     
     model.fit(
         X, Y,
-        eval_set=[(X_test,y_test)],
+        eval_set=[(X_test, y_test)],
         verbose=False
     )
 
     y_pred = model.predict(X_test)
-    return y_pred,y_test,model
+    return y_pred, y_test, model
+
 
 df = pd.read_csv('data/example_data.csv')
 
+new_df = df.copy()
+
 # Add technical indicators
-# df['SMA_10'] = df['Close'].rolling(10).mean()
-# df['SMA_30'] = df['Close'].rolling(30).mean()
-# df['Volatility'] = df['Close'].rolling(10).std()
-# df['Volume_MA'] = df['Volume'].rolling(10).mean()
+df['SMA_10'] = df['Close'].rolling(10).mean()
+df['SMA_30'] = df['Close'].rolling(30).mean()
+df['Volatility'] = df['Close'].rolling(10).std()
+df['Volume_MA'] = df['Volume'].rolling(10).mean()
 
-df['target']=df['Close'].shift(-1)
+df['target'] = df['Close'].shift(-1)
 
-df.dropna(inplace=True)#cuz shifting everything creates some null values
+df.dropna(inplace=True)  # cuz shifting everything creates some null values
 training_df = df.copy()
 
 print("Original data sample:")
 print(training_df.head())
 
-train_constant = 0.08#subject to explosive change
+train_constant = 0.5  # subject to explosive change
 
-training_df = training_df.drop(columns=["Unnamed: 0", "Date","Stock Splits","Dividends"])
+training_df = training_df.drop(columns=["Unnamed: 0", "Date", "Stock Splits", "Dividends"])
 
 # DEBUGGING AND FEATURE SCALING SECTION
 print(f"\nDataset shape: {training_df.shape}")
@@ -74,28 +76,32 @@ print(training_df[feature_cols].describe())
 print(f"\nAny NaN values: {training_df.isnull().sum().sum()}")
 print(f"Any infinite values: {np.isinf(training_df[feature_cols]).sum().sum()}")
 
+# Split into train/test FIRST (to avoid leakage)
+train, test = train_test_split(training_df, train_constant)
+
 # Scale features cuz everything was innaccurate
 scaler = RobustScaler()
-training_df[feature_cols] = scaler.fit_transform(training_df[feature_cols])
+train[feature_cols] = scaler.fit_transform(train[feature_cols])   # fit only on train
+test[feature_cols] = scaler.transform(test[feature_cols])         # apply on test
 
-print("\nAfter scaling - feature statistics:")
-print(training_df[feature_cols].describe())
+print("\nAfter scaling - feature statistics (train):")
+print(train[feature_cols].describe())
+
+print("\nAfter scaling - feature statistics (test):")
+print(test[feature_cols].describe())
 
 # Check if scaling actually worked
-print(f"\nFeature means after scaling: {training_df[feature_cols].mean().values}")
-print(f"Feature stds after scaling: {training_df[feature_cols].std().values}")
+print(f"\nFeature means after scaling (train): {train[feature_cols].mean().values}")
+print(f"Feature stds after scaling (train): {train[feature_cols].std().values}")
 
-print("\nScaled data sample:")
-print(training_df.head())
+print("\nScaled data sample (train):")
+print(train.head())
 
 # Additional debugging - check target variable
 print(f"\nTarget variable stats:")
 print(f"Min: {training_df['target'].min()}, Max: {training_df['target'].max()}")
 print(f"Mean: {training_df['target'].mean()}, Std: {training_df['target'].std()}")
 # END OF SCALING SECTION
-
-train,test = train_test_split(training_df,train_constant)
-
 
 # predict using the function
 y_pred, y_test, model = xgb_predict(train, test)
@@ -107,7 +113,7 @@ print("\nModel Performance:")
 print("Test MSE:", mse)
 print("Test R2:", r2)
 
-plt.figure(figsize=(12,6))
+plt.figure(figsize=(12, 6))
 
 # Plot actual closing prices
 plt.plot(y_test, label="Actual Close", color='blue', linewidth=2)

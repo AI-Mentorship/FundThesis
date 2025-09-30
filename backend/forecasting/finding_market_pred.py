@@ -6,7 +6,7 @@ import pandas as pd
 
 def get_stock_data(ticker):
     ticker_obj = yf.Ticker(ticker)
-    hist = ticker_obj.history(period="15y")  # last 1 year
+    hist = ticker_obj.history(period="1y")  # last 1 year
     hist = hist.reset_index()  # move Date from index to column
     return hist
 
@@ -59,7 +59,7 @@ def plot_forecast(df, arima_forecast=None, prophet_forecast=None,sarima_forecast
 
 # Usage
 stock_data = get_stock_data('AAPL')
-stock_data.to_csv("backend/forecasting/example_data.csv")
+stock_data.to_csv("data/example_data.csv")
 
 # forecasting_results = get_forecasting_prediction(stock_data, 30)
 
