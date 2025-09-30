@@ -12,3 +12,12 @@ newspaper3k
 finnhub-python
 lxml
 
+#forecasting
+prophet
+yfinance
+pandas
+statsmodels
+matplotlib
+xgboost
+scikit-learn
+sklearn
