@@ -1,45 +1,46 @@
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import sqlite3
 
+# Initialize the tokenizer and model
 tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
 model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert")
 
 # Connect to the NewsArticles.db and extract headlines with their row IDs
-conn = sqlite3.connect("backend/webScraper/NewsArticles.db")
-cursor = conn.cursor()
-cursor.execute("SELECT id, headline FROM articles WHERE headline IS NOT NULL")
-rows = cursor.fetchall()
-ids = [row[0] for row in rows]
-financial_texts = [row[1] for row in rows]
+with sqlite3.connect("backend/webScraper/NewsArticles.db") as conn:
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, headline FROM articles WHERE headline IS NOT NULL")
+    rows = cursor.fetchall()
+    ids = [row[0] for row in rows]
+    financial_texts = [row[1] for row in rows]
 
-inputs = tokenizer(
-    financial_texts,
-    padding=True,
-    truncation=True,
-    return_tensors='pt'  # Return PyTorch tensors
-)
+    if financial_texts:
+        # Tokenize the financial texts
+        inputs = tokenizer(
+            financial_texts,
+            padding=True,
+            truncation=True,
+            return_tensors='pt'  # Return PyTorch tensors
+        )
 
-outputs = model(**inputs)
+        # Perform model inference
+        with torch.no_grad():
+            outputs = model(**inputs)
+            probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)
+            predicted_labels = torch.argmax(probabilities, dim=-1)
 
-probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)
+        # Map the numerical labels to sentiment words
+        sentiment_mapping = {0: 'positive', 1: 'negative', 2: 'neutral'}  # Adjust based on model's output order
 
-# You can then get the predicted sentiment label
-predicted_labels = torch.argmax(probabilities, dim=-1)
-
-# Map the numerical labels to sentiment words (e.g., 0: 'positive', 1: 'negative', 2: 'neutral')
-sentiment_mapping = {0: 'positive', 1: 'negative', 2: 'neutral'} # Adjust based on model's output order
-
-
-for i, text in enumerate(financial_texts):
-    sentiment = sentiment_mapping[predicted_labels[i].item()]
-    capitalized_sentiment = sentiment.capitalize()
-    print(f"Text: \"{text}\" -> Predicted Sentiment: {capitalized_sentiment}")
-    # Always update the corresponding row in the database
-    cursor.execute(
-        "UPDATE articles SET [Predicted Sentiment]=? WHERE id=?",
-        (capitalized_sentiment, ids[i])
-    )
-
-conn.commit()
-conn.close()
+        # Update the database with the predicted sentiments
+        for i, text in enumerate(financial_texts):
+            sentiment = sentiment_mapping[predicted_labels[i].item()]
+            capitalized_sentiment = sentiment.capitalize()
+            print(f"Text: \"{text}\" -> Predicted Sentiment: {capitalized_sentiment}")
+            cursor.execute(
+                "UPDATE articles SET [Predicted Sentiment]=? WHERE id=?",
+                (capitalized_sentiment, ids[i])
+            )
+        conn.commit()
+    else:
+        print("No headlines found in the database.")
