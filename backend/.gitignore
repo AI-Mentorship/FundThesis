@@ -21,3 +21,6 @@ config.ini
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
+
+#Junk csv data file
+example_data.csv
