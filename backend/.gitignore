@@ -26,3 +26,5 @@ config.ini
 *.db
 *.sqlite
 *.sqlite3
+#Junk csv data file
+example_data.csv
