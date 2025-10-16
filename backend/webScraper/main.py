@@ -4,9 +4,10 @@ import utils as newImp
 newImp.articleToDB("NewsArticles")   # just the db_name
 newImp.quick_dbcheck()
 
+
 if __name__ == "__main__":
     # 1) One-shot fetch+extract+insert (uses robust HTML fetch + fallbacks)
-    newImp.articleToDB(db_name="NewsArticles", category="general", limit=400)
+    newImp.articleToDB(db_name="NewsArticles")
 
     # 2) (Optional) Retry any rows that inserted with empty full_text or fetch errors
     #    Useful if some sites throttled you the first pass.
