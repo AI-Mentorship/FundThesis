@@ -1,5 +1,5 @@
 # This is the improved testing scraping logic
-import newsScraper_Improved as newImp
+import utils as newImp
 
 newImp.articleToDB("NewsArticles")   # just the db_name
 newImp.quick_dbcheck()

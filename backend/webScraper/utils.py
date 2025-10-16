@@ -60,7 +60,10 @@ def finn_client():
 # ---------- Database ----------
 def setup_database(db_name: str):
     global connection, cursor
-    connection = sqlite3.connect(f"{db_name}.db")
+    BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # goes up from webscraper to backend
+    DB_PATH = os.path.join(BASE_DIR, "db", "NewsArticles.db")
+
+    connection = sqlite3.connect(DB_PATH)
     cursor = connection.cursor()
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS articles(
