@@ -1,67 +1,120 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Stock {
-  symbol: string
-  company: string
-  logo: string
-  price: number
-  change: number
-  changePercent: number
+  symbol: string;
+  company: string;
+  logo: string;
+  price: number;
+  change: number;
+  changePercent: number;
 }
 
 const stocks: Stock[] = [
-  { symbol: 'AAPL', company: 'Apple Inc.', logo: '🍎', price: 175.43, change: 2.15, changePercent: 1.24 },
-  { symbol: 'MSFT', company: 'Microsoft Corporation', logo: '🪟', price: 378.85, change: 4.67, changePercent: 1.25 },
-  { symbol: 'META', company: 'Meta Platforms Inc.', logo: '📘', price: 352.14, change: -2.67, changePercent: -0.75 },
-  { symbol: 'GOOGL', company: 'Alphabet Inc.', logo: '🔍', price: 142.56, change: -1.23, changePercent: -0.85 },
-  { symbol: 'AMZN', company: 'Amazon.com Inc.', logo: '📦', price: 145.78, change: 1.89, changePercent: 1.31 },
-  { symbol: 'TSLA', company: 'Tesla Inc.', logo: '⚡', price: 248.50, change: -3.45, changePercent: -1.37 },
-  { symbol: 'NVDA', company: 'NVIDIA Corporation', logo: '🎮', price: 875.28, change: 12.45, changePercent: 1.44 },
-]
+  {
+    symbol: "AAPL",
+    company: "Apple Inc.",
+    logo: "🍎",
+    price: 175.43,
+    change: 2.15,
+    changePercent: 1.24,
+  },
+  {
+    symbol: "MSFT",
+    company: "Microsoft Corporation",
+    logo: "🪟",
+    price: 378.85,
+    change: 4.67,
+    changePercent: 1.25,
+  },
+  {
+    symbol: "META",
+    company: "Meta Platforms Inc.",
+    logo: "📘",
+    price: 352.14,
+    change: -2.67,
+    changePercent: -0.75,
+  },
+  {
+    symbol: "GOOGL",
+    company: "Alphabet Inc.",
+    logo: "🔍",
+    price: 142.56,
+    change: -1.23,
+    changePercent: -0.85,
+  },
+  {
+    symbol: "AMZN",
+    company: "Amazon.com Inc.",
+    logo: "📦",
+    price: 145.78,
+    change: 1.89,
+    changePercent: 1.31,
+  },
+  {
+    symbol: "TSLA",
+    company: "Tesla Inc.",
+    logo: "⚡",
+    price: 248.5,
+    change: -3.45,
+    changePercent: -1.37,
+  },
+  {
+    symbol: "NVDA",
+    company: "NVIDIA Corporation",
+    logo: "🎮",
+    price: 875.28,
+    change: 12.45,
+    changePercent: 1.44,
+  },
+];
 
 export function StockCardStack() {
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   const goToPrevious = () => {
-    setCurrentIndex((prev) => (prev === 0 ? stocks.length - 1 : prev - 1))
-  }
+    setCurrentIndex((prev) => (prev === 0 ? stocks.length - 1 : prev - 1));
+  };
 
   const goToNext = () => {
-    setCurrentIndex((prev) => (prev === stocks.length - 1 ? 0 : prev + 1))
-  }
+    setCurrentIndex((prev) => (prev === stocks.length - 1 ? 0 : prev + 1));
+  };
 
   const getCardStyle = (index: number) => {
-    const distance = Math.abs(index - currentIndex)
-    const direction = index - currentIndex
-    
+    const distance = Math.abs(index - currentIndex);
+    const direction = index - currentIndex;
+
     if (distance === 0) {
       return {
-        transform: 'translateX(0) scale(1)',
+        transform: "translateX(0) scale(1)",
         zIndex: 30,
-        filter: 'blur(0px)',
+        filter: "blur(0px)",
         opacity: 1,
-      }
+      };
     } else if (distance === 1) {
       return {
-        transform: `translateX(${direction > 0 ? '180px' : '-180px'}) scale(0.85)`,
+        transform: `translateX(${
+          direction > 0 ? "180px" : "-180px"
+        }) scale(0.85)`,
         zIndex: 20,
-        filter: 'blur(2px)',
+        filter: "blur(2px)",
         opacity: 0.6,
-      }
+      };
     } else {
       return {
-        transform: `translateX(${direction > 0 ? '300px' : '-300px'}) scale(0.7)`,
+        transform: `translateX(${
+          direction > 0 ? "300px" : "-300px"
+        }) scale(0.7)`,
         zIndex: 10,
-        filter: 'blur(4px)',
+        filter: "blur(4px)",
         opacity: 0.3,
-      }
+      };
     }
-  }
+  };
 
-  const currentStock = stocks[currentIndex]
+  //const currentStock = stocks[currentIndex]
 
   return (
     <div className="relative flex items-center justify-center w-full max-w-6xl mx-auto px-8">
@@ -91,7 +144,9 @@ export function StockCardStack() {
                     {stock.logo}
                   </div>
                   <div>
-                    <h3 className="text-gray-900 text-2xl font-bold">{stock.symbol}</h3>
+                    <h3 className="text-gray-900 text-2xl font-bold">
+                      {stock.symbol}
+                    </h3>
                     <p className="text-gray-600 text-sm">{stock.company}</p>
                   </div>
                 </div>
@@ -99,9 +154,18 @@ export function StockCardStack() {
 
               {/* Price Section */}
               <div className="text-center py-6">
-                <p className="text-gray-900 text-5xl font-bold">${stock.price.toFixed(2)}</p>
-                <p className={`text-xl font-semibold mt-2 ${stock.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%)
+                <p className="text-gray-900 text-5xl font-bold">
+                  ${stock.price.toFixed(2)}
+                </p>
+                <p
+                  className={`text-xl font-semibold mt-2 ${
+                    stock.change >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {stock.change >= 0 ? "+" : ""}
+                  {stock.change.toFixed(2)} (
+                  {stock.changePercent >= 0 ? "+" : ""}
+                  {stock.changePercent.toFixed(2)}%)
                 </p>
               </div>
 
@@ -109,7 +173,9 @@ export function StockCardStack() {
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center space-y-4 w-full">
                   <div className="w-full h-64 rounded-2xl bg-gray-50 border-2 border-gray-200 flex items-center justify-center">
-                    <div className="text-gray-400 text-sm">Chart Placeholder</div>
+                    <div className="text-gray-400 text-sm">
+                      Chart Placeholder
+                    </div>
                   </div>
                 </div>
               </div>
@@ -117,10 +183,14 @@ export function StockCardStack() {
               {/* Card Footer */}
               <div className="flex items-center justify-center space-x-3 mt-6">
                 <div className="px-4 py-2 rounded-full bg-green-100 border-2 border-green-400">
-                  <span className="text-green-600 text-sm font-semibold">Buy</span>
+                  <span className="text-green-600 text-sm font-semibold">
+                    Buy
+                  </span>
                 </div>
                 <div className="px-4 py-2 rounded-full bg-gray-100 border-2 border-gray-300">
-                  <span className="text-gray-600 text-sm font-semibold">Hold</span>
+                  <span className="text-gray-600 text-sm font-semibold">
+                    Hold
+                  </span>
                 </div>
               </div>
             </div>
@@ -144,12 +214,12 @@ export function StockCardStack() {
             onClick={() => setCurrentIndex(index)}
             className={`w-2 h-2 rounded-full transition-all duration-300 ${
               index === currentIndex
-                ? 'bg-green-400 w-6'
-                : 'bg-white/30 hover:bg-white/50'
+                ? "bg-green-400 w-6"
+                : "bg-white/30 hover:bg-white/50"
             }`}
           />
         ))}
       </div>
     </div>
-  )
+  );
 }
