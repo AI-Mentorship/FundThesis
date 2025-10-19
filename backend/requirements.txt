@@ -1,0 +1,29 @@
+# backend
+fastapi
+uvicorn
+
+# webscraper 
+python-dotenv
+beautifulsoup4
+readability-lxml
+requests
+trafilatura
+newspaper3k
+finnhub-python
+lxml
+
+
+
+#forecasting
+prophet
+yfinance
+pandas
+statsmodels
+matplotlib
+xgboost
+scikit-learn
+sklearn# Add PyTorch for GPU with CUDA 11.8
+torch==2.0.1+cu118 --index-url https://download.pytorch.org/whl/cu118
+
+# Add Transformers library
+transformers

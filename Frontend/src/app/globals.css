@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+/* Custom color for ticker */
+.ticker-bg {
+  background-color: #05022c;
+}
+
+/* Custom animations for stock ticker */
+@keyframes marquee {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+.animate-marquee-fast {
+  animation: marquee 30s linear infinite;
+}
+
+/* Responsive design utilities */
+@media (max-width: 768px) {
+  .animate-marquee {
+    animation: marquee 20s linear infinite;
+  }
+  .animate-marquee-fast {
+    animation: marquee 10s linear infinite;
+  }
+}
