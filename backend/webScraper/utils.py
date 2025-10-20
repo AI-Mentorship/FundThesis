@@ -22,6 +22,13 @@ from readability import Document
 
 import finnhub
 
+#FinBERT setup
+# Use a pipeline as a high-level helper
+from transformers import pipeline
+pipe = pipeline("text-classification", model="ProsusAI/finbert")
+
+
+
 MIN_WORDS = 150
 
 load_dotenv()
@@ -77,6 +84,7 @@ def setup_database(db_name: str):
         summary TEXT,
         full_text TEXT,
         url TEXT,
+        label TEXT,
         inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -229,82 +237,6 @@ def _fetch_html_following_better_url(url: str) -> tuple[str, str, int|None]:
 
     return final_url, html, status
 
-def _fetch_html_following_better_url(url: str) -> tuple[str, str, int|None]:
-    """
-    Returns (final_url, html, http_status). Tries AMP/canonical if they look better.
-    """
-    # 1) fetch original
-    status, html = fetch_html(url)
-    final_url = url
-    if not html:
-        return final_url, "", status
-
-    # 2) see if there is a better target (prefer AMP first; it’s usually static/full)
-    can_url, amp_url = _canonical_and_amp(html, final_url)
-
-    # Pick AMP if same domain and not obviously truncated aggregators
-    def _same_domain(u1, u2):
-        try:
-            return urlparse(u1).netloc.split(":")[0] == urlparse(u2).netloc.split(":")[0]
-        except Exception:
-            return False
-
-    candidate = None
-    if amp_url and (_same_domain(final_url, amp_url) or ("amp." in amp_url)):
-        candidate = amp_url
-    elif can_url:
-        candidate = can_url
-
-    if candidate and candidate != final_url:
-        st2, html2 = fetch_html(candidate)
-        if html2 and len(html2) > max(len(html)*0.6, 4000):  # crude heuristic: bigger page likely has full text
-            return candidate, html2, st2 or status
-
-    return final_url, html, status
-
-def get_fulltext(url: str) -> tuple[str|None, str|None, str|None, int|None, dict]:
-    """
-    Returns (text, status, error, http_status, meta)
-    status: 'ok' | 'empty' | 'blocked' | 'error' | 'short'
-    meta: dict with used_extractor, best_url, html_len
-    """
-    best_url, html, http_status = _fetch_html_following_better_url(url)
-    if not html:
-        return None, ('blocked' if (http_status and http_status in (401,403)) else 'error'), "no_html", http_status, {"best_url": best_url, "used_extractor": None, "html_len": 0}
-
-    html_len = len(html)
-
-    # Try extractors in order; require a reasonable length
-    for name, fn in [
-        ("trafilatura", _extract_trafilatura),
-        ("newspaper3k", lambda h: _extract_newspaper(best_url, h)),
-        ("readability", _extract_readability),
-        ("article-tag", _extract_article_tag),
-    ]:
-        try:
-            text = fn(html)
-            if text and len(text.split()) >= MIN_WORDS:
-                return text, "ok", None, http_status, {"best_url": best_url, "used_extractor": name, "html_len": html_len}
-            # If we got something but short, keep it as a candidate; try next method first
-            short_candidate = text
-        except Exception:
-            short_candidate = None
-        # keep trying next extractor
-
-    # If all methods “short”, return the longest short candidate
-    best = max(
-        [(_extract_trafilatura(html) or ""),
-         (_extract_newspaper(best_url, html) or ""),
-         (_extract_readability(html) or ""),
-         (_extract_article_tag(html) or "")],
-        key=lambda t: len(t)
-    )
-    if best:
-        status = "short" if len(best.split()) < MIN_WORDS else "ok"
-        return best, status, None, http_status, {"best_url": best_url, "used_extractor": "fallback-longest", "html_len": html_len}
-
-    return None, "empty", "extract_failed", http_status, {"best_url": best_url, "used_extractor": None, "html_len": html_len}
-
 def get_fulltext(url: str) -> tuple[str|None, str|None, str|None, int|None, dict]:
     """
     Returns (text, status, error, http_status, meta)
@@ -351,6 +283,8 @@ def get_fulltext(url: str) -> tuple[str|None, str|None, str|None, int|None, dict
 
 # ---------- Insert ----------
 def insert_intoDB(article_db: dict, text: str|None, status: str, error: str|None, http_status: int|None, meta: dict):
+    finb_summaryinp = article_db.get('summary')
+    into_label = run_finbert(finb_summaryinp)
     domain = None
     try:
         domain = urlparse(article_db['url']).netloc
@@ -358,8 +292,8 @@ def insert_intoDB(article_db: dict, text: str|None, status: str, error: str|None
         pass
     cursor.execute("""
         INSERT OR IGNORE INTO articles
-        (article_id, category, datetime, headline, related, source, summary, full_text, url, fetch_status, fetch_error, source_domain)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (article_id, category, datetime, headline, related, source, summary, full_text, url, label, fetch_status, fetch_error, source_domain)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         article_db.get('id'),
         article_db.get('category'),
@@ -370,6 +304,7 @@ def insert_intoDB(article_db: dict, text: str|None, status: str, error: str|None
         article_db.get('summary'),
         text,
         meta.get("best_url") or article_db.get('url'),
+        into_label,
         f"{status}:{http_status}|{meta.get('used_extractor')}|html={meta.get('html_len')}",
         error,
         domain
@@ -389,6 +324,12 @@ def articleToDB(db_name: str = "fundthesis"):
         inserted += 1
     connection.commit()
     print(f"Inserted {inserted} articles")
+
+#-------------FinBert-------------
+def run_finbert(summ_of_article):
+    result = pipe(summ_of_article)
+    label = result[0]['label']
+    return label
 
 
 def quick_dbcheck():

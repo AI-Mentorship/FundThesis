@@ -1,7 +1,7 @@
 # This is the improved testing scraping logic
 import utils as newImp
 
-newImp.articleToDB("NewsArticles")   # just the db_name
+newImp.articleToDB("NewsArticles.db")   # just the db_name
 newImp.quick_dbcheck()
 
 
