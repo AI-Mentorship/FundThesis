@@ -1,12 +1,10 @@
 import React from 'react'
-import Navbar from '@/components/Navbar'
-import StockTicker from '@/components/StockTicker'
+import PageLayout from '@/components/PageLayout'
 
 export default function InsightsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <StockTicker />
+      
       
       <main className="max-w-7xl mx-auto px-4 py-8">
         <h1 className="text-4xl font-bold text-gray-900 mb-6">Insights</h1>
@@ -40,6 +38,7 @@ export default function InsightsPage() {
           </div>
         </div>
       </main>
+    
     </div>
   )
 }
