@@ -27,3 +27,12 @@ torch==2.0.1+cu118 --index-url https://download.pytorch.org/whl/cu118
 
 # Add Transformers library
 transformers
+
+# Libraries for RAG
+pydantic
+chromadb
+sentence_transformers
+PyMuPDF
+python-multipart
+dotenv
+pytest
