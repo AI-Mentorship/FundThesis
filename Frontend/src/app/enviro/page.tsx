@@ -1,8 +1,18 @@
+'use client'
 import React from 'react'
 import Navbar from '@/components/Navbar'
 import StockTicker from '@/components/StockTicker'
+import { useRouter } from 'next/navigation'
 
+{/*handle page switching*/}
 export default function EnviroPage() {
+
+  const router = useRouter()
+
+  const handleNavigate = () => {
+    router.push('/enviro/enviro-dashboard')
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -57,6 +67,15 @@ export default function EnviroPage() {
               environmental responsibility. Our AI analyzes ESG ratings and performance metrics 
               to identify the best sustainable investment opportunities.
             </p>
+          </div>
+
+          <div className="mt-10">
+            <button
+              onClick={handleNavigate}
+              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded"
+            >
+              Go to EnviroThesis
+            </button>
           </div>
         </div>
       </main>
