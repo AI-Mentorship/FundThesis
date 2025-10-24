@@ -1,13 +1,12 @@
 'use client'
 import React from 'react'
-import Navbar from '@/components/Navbar'
-import StockTicker from '@/components/StockTicker'
+import PageLayout from '@/components/PageLayout'
+
 import { useRouter } from 'next/navigation'
 
-{/*handle page switching*/}
 export default function EnviroPage() {
 
-  const router = useRouter()
+    const router = useRouter()
 
   const handleNavigate = () => {
     router.push('/enviro/enviro-dashboard')
@@ -15,8 +14,7 @@ export default function EnviroPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <StockTicker />
+      
       
       <main className="max-w-7xl mx-auto px-4 py-8">
         <h1 className="text-4xl font-bold text-gray-900 mb-6">EnviroThesis</h1>
@@ -79,6 +77,7 @@ export default function EnviroPage() {
           </div>
         </div>
       </main>
+     
     </div>
   )
 }

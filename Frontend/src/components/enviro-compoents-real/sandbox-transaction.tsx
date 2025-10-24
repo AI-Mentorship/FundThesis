@@ -1,5 +1,5 @@
 
-interface Transaction {
+export interface Transaction {
   id: string
   date: string // e.g. '2025-10-22 14:30'
   symbol: string
