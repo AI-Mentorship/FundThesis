@@ -1,44 +1,43 @@
 import React from 'react'
 import PageLayout from '@/components/PageLayout'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { Card, CardContent, CardTitle, CardDescription } from '@/components/ui/Card'
 
 export default function InsightsPage() {
+  const insights = [
+    {
+      title: "Market Summary",
+      description: "Markets showed positive momentum today with tech stocks leading the gains. AI and semiconductor sectors continue to attract investor attention."
+    },
+    {
+      title: "AI Recommendations",
+      description: "Based on your portfolio and risk profile, consider diversifying into emerging markets and renewable energy sectors."
+    },
+    {
+      title: "News Highlights",
+      description: "Latest financial news and market-moving events will be summarized here using our AI-powered news aggregation system."
+    }
+  ]
+
   return (
     <div className="min-h-screen bg-gray-50">
-      
-      
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-6">Insights</h1>
-        <p className="text-xl text-gray-600 mb-8">
-          AI-powered market analysis and stock recommendations
-        </p>
+        <PageHeader 
+          title="Insights"
+          description="AI-powered market analysis and stock recommendations"
+        />
         
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Market Summary</h3>
-            <p className="text-gray-600">
-              Markets showed positive momentum today with tech stocks leading the gains. 
-              AI and semiconductor sectors continue to attract investor attention.
-            </p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">AI Recommendations</h3>
-            <p className="text-gray-600">
-              Based on your portfolio and risk profile, consider diversifying into 
-              emerging markets and renewable energy sectors.
-            </p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">News Highlights</h3>
-            <p className="text-gray-600">
-              Latest financial news and market-moving events will be summarized here 
-              using our AI-powered news aggregation system.
-            </p>
-          </div>
+          {insights.map((insight, index) => (
+            <Card key={index}>
+              <CardContent>
+                <CardTitle className="mb-2">{insight.title}</CardTitle>
+                <CardDescription>{insight.description}</CardDescription>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </main>
-    
     </div>
   )
 }
