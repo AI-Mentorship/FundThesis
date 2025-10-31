@@ -91,6 +91,8 @@ export function PortfolioChart({ portfolioHistory }: PortfolioChartProps) {
 
   return (
     <div className="w-full">
+      <div className="mb-4">
+      </div>
       {/*max-w-[50%] min-w-[300px] */}
       {/* Card-like container <div className="w-full max-w-3xl mx-auto">*/}
       <div className="bg-white rounded-xl border shadow-sm p-4">

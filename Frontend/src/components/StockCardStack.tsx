@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { StockCard } from './StockCard'
 
@@ -35,8 +36,8 @@ interface StockCardStackProps {
   stockDetails: { [key: string]: StockDetail }
   currentIndex: number
   setCurrentIndex: (index: number) => void
-  timeframe: 'day' | 'month' | 'year'
-  setTimeframe: (timeframe: 'day' | 'month' | 'year') => void
+  timeframe: 'day' | 'month' | 'year' | 'all'
+  setTimeframe: (timeframe: 'day' | 'month' | 'year' | 'all') => void
   loadingMore: boolean
   checkAndLoadMore: (index: number) => void
   fetchStockDetail: (symbol: string) => Promise<void>
@@ -44,8 +45,8 @@ interface StockCardStackProps {
   ExpandedModal?: React.ComponentType<{
     stock: StockDetail
     onClose: () => void
-    timeframe: 'day' | 'month' | 'year'
-    setTimeframe: (timeframe: 'day' | 'month' | 'year') => void
+    timeframe: 'day' | 'month' | 'year' | 'all'
+    setTimeframe: (timeframe: 'day' | 'month' | 'year' | 'all') => void
     fetchStockDetail: (symbol: string) => Promise<void>
     stockDetails: { [key: string]: StockDetail }
   }>
@@ -154,16 +155,25 @@ export function StockCardStack({
         </div>
       </div>
 
-      {expandedStock && ExpandedModal && (
-        <ExpandedModal
-          stock={expandedStock}
-          onClose={closeExpanded}
-          timeframe={timeframe}
-          setTimeframe={setTimeframe}
-          fetchStockDetail={fetchStockDetail}
-          stockDetails={stockDetails}
-        />
-      )}
+      {expandedStock && ExpandedModal && (() => {
+        const modal = (
+          <ExpandedModal
+            stock={expandedStock}
+            onClose={closeExpanded}
+            timeframe={timeframe}
+            setTimeframe={setTimeframe}
+            fetchStockDetail={fetchStockDetail}
+            stockDetails={stockDetails}
+          />
+        )
+
+        // Render modal into document.body to avoid being clipped by parent transforms
+        if (typeof document !== 'undefined') {
+          return createPortal(modal, document.body)
+        }
+
+        return modal
+      })()}
     </>
   )
 }

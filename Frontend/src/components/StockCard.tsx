@@ -30,8 +30,8 @@ interface StockCardProps {
   stock: Stock
   detail?: StockDetail
   isActive: boolean
-  timeframe: 'day' | 'month' | 'year'
-  setTimeframe: (timeframe: 'day' | 'month' | 'year') => void
+  timeframe: 'day' | 'month' | 'year' | 'all'
+  setTimeframe: (timeframe: 'day' | 'month' | 'year' | 'all') => void
   onClick: () => void
 }
 
@@ -110,12 +110,12 @@ export function StockCard({
 
       {/* Timeframe Buttons */}
       <div className="flex gap-2">
-        {['day', 'month', 'year'].map((tf) => (
+        {['day', 'month', 'year', 'all'].map((tf) => (
           <button
             key={tf}
             onClick={(e) => {
               e.stopPropagation()
-              setTimeframe(tf as 'day' | 'month' | 'year')
+              setTimeframe(tf as 'day' | 'month' | 'year' | 'all')
             }}
             className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
               timeframe === tf

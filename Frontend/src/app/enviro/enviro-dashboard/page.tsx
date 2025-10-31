@@ -1,5 +1,6 @@
 "use client"
 import React, { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Search, X } from "lucide-react";
 import { PortfolioChart, PortfolioHistoryPoint } from "@/components/enviro-compoents-real/Portfolio";
 import { PortfolioSummary } from "@/components/enviro-compoents-real/PortfolioSummary";
@@ -7,6 +8,7 @@ import Navbar from "@/components/Navbar";
 import StockTicker from "@/components/StockTicker";
 import MarketTips from "@/components/enviro-compoents-real/market-tips";
 import { StockCardStack } from '@/components/StockCardStack';
+import StockTradeModal from '@/components/StockTradeModal';
 import { TransactionHistory, Transaction} from "@/components/enviro-compoents-real/sandbox-transaction";
 
 // Sample stock data - ALL available stocks
@@ -54,10 +56,7 @@ const mockData: PortfolioHistoryPoint[] = [
   { timestamp: new Date('2025-10-09'), value: 10850 },
 ];
 
-const totalValue = 10850;
-const cashBalance = 3000;
-const totalGainLoss = totalValue - mockData[0].value;
-const totalGainLossPercent = (totalGainLoss / mockData[0].value) * 100;
+
 
 export default function PortfolioDashboardPage() {
   // Search state
@@ -67,8 +66,49 @@ export default function PortfolioDashboardPage() {
   const [stocks, setStocks] = useState(allStocks);
   const [stockDetails, setStockDetails] = useState<any>({});
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [timeframe, setTimeframe] = useState<'day' | 'month' | 'year'>('day');
+  const [timeframe, setTimeframe] = useState<'day' | 'month' | 'year' | 'all'>('day');
   const [loadingMore, setLoadingMore] = useState(false);
+  const searchParams = useSearchParams()
+
+  type Difficulty = 'easy' | 'medium' | 'hard'
+  type Sandbox = { id: string; name: string; difficulty: Difficulty; balance: number; createdAt: string }
+
+  const [sandbox, setSandbox] = useState<Sandbox | null>(null)
+  const [cashBalance, setCashBalance] = useState<number>(3000)
+
+  const router = useRouter()
+
+  const deleteCurrentSandbox = () => {
+    try {
+      if (!sandbox) return
+      const raw = localStorage.getItem('enviro_sandboxes')
+      if (!raw) {
+        router.push('/enviro')
+        return
+      }
+      const items: Sandbox[] = JSON.parse(raw)
+      const remaining = items.filter(s => s.id !== sandbox.id)
+      localStorage.setItem('enviro_sandboxes', JSON.stringify(remaining))
+      // also remove persisted portfolio for this sandbox
+      try {
+        const portRaw = localStorage.getItem('enviro_sandbox_portfolios')
+        if (portRaw) {
+          const map = JSON.parse(portRaw)
+          delete map[sandbox.id]
+          localStorage.setItem('enviro_sandbox_portfolios', JSON.stringify(map))
+        }
+      } catch (e) {
+        console.warn('failed to remove sandbox portfolio', e)
+      }
+      // navigate back to sandbox manager
+      router.push('/enviro')
+    } catch (e) {
+      console.error('Failed to delete sandbox', e)
+    }
+  }
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState<string>('')
 
   // Handle search functionality
   useEffect(() => {
@@ -91,12 +131,60 @@ export default function PortfolioDashboardPage() {
     setStocks(filteredStocks);
   }, [filteredStocks]);
 
+  // Read sandboxId from query params and try to load matching sandbox from localStorage
+  useEffect(() => {
+    try {
+      const id = searchParams?.get('sandboxId')
+      if (!id) return
+      const raw = localStorage.getItem('enviro_sandboxes')
+      if (!raw) return
+      const items: Sandbox[] = JSON.parse(raw)
+      const found = items.find(s => s.id === id)
+      if (found) {
+        setSandbox(found)
+
+        // load portfolio persisted for this sandbox if available
+        try {
+          const portRaw = localStorage.getItem('enviro_sandbox_portfolios')
+          if (portRaw) {
+            const map: { [id: string]: { cashBalance: number; transactions: Transaction[] } } = JSON.parse(portRaw)
+            const saved = map[found.id]
+            if (saved) {
+              setCashBalance(saved.cashBalance)
+              setTransactions(saved.transactions || [])
+            } else {
+              // initialize portfolio with sandbox balance
+              setCashBalance(found.balance)
+              setTransactions([])
+              const newMap = map
+              newMap[found.id] = { cashBalance: found.balance, transactions: [] }
+              localStorage.setItem('enviro_sandbox_portfolios', JSON.stringify(newMap))
+            }
+          } else {
+            // create initial portfolios map
+            setCashBalance(found.balance)
+            setTransactions([])
+            const newMap: { [id: string]: { cashBalance: number; transactions: Transaction[] } } = {}
+            newMap[found.id] = { cashBalance: found.balance, transactions: [] }
+            localStorage.setItem('enviro_sandbox_portfolios', JSON.stringify(newMap))
+          }
+        } catch (e) {
+          console.warn('Failed to load or initialize sandbox portfolio', e)
+          setCashBalance(found.balance)
+          setTransactions([])
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load sandbox from localStorage', e)
+    }
+  }, [searchParams])
+
   // Function to generate mock chart data
   const generateChartData = (symbol: string, timeframe: 'day' | 'month' | 'year') => {
     const stock = stocks.find(s => s.symbol === symbol);
     if (!stock) return [];
     
-    const points = timeframe === 'day' ? 24 : timeframe === 'month' ? 30 : 365;
+  const points = timeframe === 'day' ? 24 : timeframe === 'month' ? 30 : timeframe === 'year' ? 365 : 730;
     const data = [];
     const basePrice = stock.price;
     
@@ -160,22 +248,97 @@ export default function PortfolioDashboardPage() {
     }
   }, [currentIndex, timeframe]);
 
-  const transactions = sampleTransactions;
+  const [transactions, setTransactions] = useState<Transaction[]>(sampleTransactions);
+
+  // compute holdings per symbol from transactions
+  const holdingsMap: { [symbol: string]: number } = {}
+  transactions.forEach(tx => {
+    holdingsMap[tx.symbol] = (holdingsMap[tx.symbol] || 0) + (tx.action === 'Buy' ? tx.quantity : -tx.quantity)
+  })
+
+  const handleExecuteTrade = (action: 'Buy' | 'Sell', symbol: string, price: number, quantity: number) => {
+    const total = price * quantity
+    const now = new Date()
+    const tx: Transaction = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+      date: `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
+      symbol,
+      action,
+      quantity,
+      price,
+      total,
+    }
+
+    // Compute new cash and transactions and persist immediately
+    setTransactions(prev => {
+      const next = [tx, ...prev]
+      try {
+        if (sandbox) {
+          const portRaw = localStorage.getItem('enviro_sandbox_portfolios')
+          const map = portRaw ? JSON.parse(portRaw) : {}
+          const prevCash = (map[sandbox.id] && map[sandbox.id].cashBalance) || cashBalance
+          const newCash = action === 'Buy' ? prevCash - total : prevCash + total
+          map[sandbox.id] = { cashBalance: newCash, transactions: next }
+          localStorage.setItem('enviro_sandbox_portfolios', JSON.stringify(map))
+          setCashBalance(newCash)
+        } else {
+          // no sandbox selected: just update cash locally
+          setCashBalance(prev => action === 'Buy' ? prev - total : prev + total)
+        }
+      } catch (e) {
+        console.warn('Failed to persist trade', e)
+      }
+
+      return next
+    })
+  }
 
   // Clear search
   const clearSearch = () => {
     setSearchQuery('');
   };
 
+  // wrapper to provide extra props to ExpandedModal
+  // compute dynamic total value from cash + holdings
+  const holdingsValue = Object.keys(holdingsMap).reduce((acc, sym) => {
+    const qty = holdingsMap[sym] || 0
+    const detail = stockDetails[sym] || allStocks.find(s => s.symbol === sym)
+    const price = detail ? (detail as any).price : 0
+    return acc + qty * price
+  }, 0)
+
+  const totalValue = cashBalance + holdingsValue
+
+  // baseline for gain/loss: if sandbox exists use its starting balance, otherwise use mock start
+  const baseline = sandbox ? sandbox.balance : mockData[0].value
+  const totalGainLoss = totalValue - baseline
+  const totalGainLossPercent = baseline ? (totalGainLoss / baseline) * 100 : 0
+
+  const ExpandedModalWrapper = (props: any) => {
+    const symbol = props.stock?.symbol
+    const holdings = symbol ? (holdingsMap[symbol] || 0) : 0
+    return (
+      <StockTradeModal
+        {...props}
+        cashBalance={cashBalance}
+        holdings={holdings}
+        onExecuteTrade={handleExecuteTrade}
+      />
+    )
+  }
+
   return (
     <div>
       <main className="p-6 bg-gray-50">
-        <h1 className="text-3xl font-bold mb-6">My Portfolio</h1>
+        <h1 className="text-3xl font-bold mb-6">{sandbox ? sandbox.name : 'My Sandbox'}</h1>
 
         <div className="flex w-full gap-6 max-h-[900px]">
           {/* Stock Card Section - contained with border */}
           <div className="w-1/2 border border-black rounded-lg bg-white p-6 overflow-hidden">
             {/* Search Bar */}
+            
+            <h2 className="text-2xl font-bold text-gray-900 pb-4">Explore</h2>
+
             <div className="mb-4 relative">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -218,13 +381,16 @@ export default function PortfolioDashboardPage() {
                   loadingMore={loadingMore}
                   checkAndLoadMore={checkAndLoadMore}
                   fetchStockDetail={fetchStockDetail}
+                  ExpandedModal={ExpandedModalWrapper}
                 />
               </div>
             </div>
           </div>
 
           {/* Portfolio Chart Section - contained with border */}
-          <div className="w-1/2 border border-black rounded-lg bg-white p-11">
+          <div className="w-1/2 border border-black rounded-lg bg-white pl-6 pr-6 pt-6">
+            <h2 className="text-2xl font-bold text-gray-900">Portfolio</h2>
+
             <PortfolioChart portfolioHistory={mockData} />
             <div className="mt-8 w-full">
               <PortfolioSummary
@@ -244,6 +410,48 @@ export default function PortfolioDashboardPage() {
         <div className="pt-6">
           <TransactionHistory transactions={transactions} />
         </div>
+        {/* Sandbox actions (delete current sandbox) */}
+        <div className="pt-6 flex justify-end">
+          {sandbox && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded"
+              title="Delete this sandbox"
+            >
+              Delete Sandbox
+            </button>
+          )}
+        </div>
+
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black opacity-40" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText('') }} />
+            <div className="relative bg-white rounded-lg p-6 w-full max-w-md z-10">
+              <h3 className="text-lg font-semibold mb-2">Confirm delete</h3>
+              <p className="text-sm text-gray-600 mb-4">To permanently delete the sandbox <span className="font-medium">{sandbox?.name}</span>, type <span className="font-mono">delete</span> below and press Confirm.</p>
+              <input
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type delete to confirm"
+                className="w-full border rounded px-3 py-2 mb-4"
+              />
+              <div className="flex justify-end gap-3">
+                <button onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText('') }} className="px-3 py-2 rounded border">Cancel</button>
+                <button
+                  onClick={() => {
+                    if (deleteConfirmText.trim().toLowerCase() === 'delete') {
+                      deleteCurrentSandbox()
+                    }
+                  }}
+                  disabled={deleteConfirmText.trim().toLowerCase() !== 'delete'}
+                  className={`px-3 py-2 rounded text-white ${deleteConfirmText.trim().toLowerCase() === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-red-300 cursor-not-allowed'}`}
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

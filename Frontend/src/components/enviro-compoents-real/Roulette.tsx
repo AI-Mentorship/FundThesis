@@ -69,6 +69,9 @@ const RouletteStocks: React.FC = () => {
 
   return (
     <div className="relative w-full max-w-5xl mx-auto py-10">
+      <div className="mb-6 flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Explore</h2>
+      </div>
       {/* Left Arrow */}
       <button
         onClick={prev}
