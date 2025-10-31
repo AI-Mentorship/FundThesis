@@ -8,11 +8,7 @@ from __future__ import annotations
 import asyncio
 from typing import Optional
 
-try:
-    from .llm import LLMClient
-except ImportError:
-    # Fallback to absolute import if relative fails
-    from backend.rag.llm import LLMClient
+from .llm import LLMClient
 
 
 class RAG:
