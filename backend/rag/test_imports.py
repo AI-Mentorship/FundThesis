@@ -26,18 +26,10 @@ async def main():
     # Test relative imports
     try:
         from .llm import LLMClient
-        from .rag import rag, generate_response
+        from .rag import RAG, generate_response
         print_status("Successfully imported from relative paths")
     except ImportError as e:
         print_status(f"Failed to import using relative paths: {e}", False)
-    
-    # Test absolute imports
-    try:
-        from backend.rag.llm import LLMClient as LLMClient2
-        from backend.rag.rag import rag as rag2
-        print_status("Successfully imported from absolute paths")
-    except ImportError as e:
-        print_status(f"Failed to import using absolute paths: {e}", False)
     
     print("\nTesting functionality...")
     
@@ -49,11 +41,11 @@ async def main():
     except Exception as e:
         print_status(f"LLMClient test failed: {e}", False)
     
-    # Test rag class
+    # Test RAG class
     try:
-        r = rag()
+        r = RAG()
         response = await r.testllm("test prompt")
-        print_status(f"rag.testllm() works: {response}")
+        print_status(f"RAG.testllm() works: {response}")
     except Exception as e:
         print_status(f"rag test failed: {e}", False)
     

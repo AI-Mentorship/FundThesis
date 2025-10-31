@@ -1,5 +1,6 @@
 import sqlite3
 import logging
+from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 try:
@@ -23,7 +24,8 @@ except Exception as e:
 
 # Connect to the NewsArticles.db and extract headlines with their row IDs
 try:
-    with sqlite3.connect("backend/webScraper/NewsArticles.db") as conn:
+    db_path = Path(__file__).parent / "NewsArticles.db"
+    with sqlite3.connect(str(db_path)) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, headline FROM articles WHERE headline IS NOT NULL")
         rows = cursor.fetchall()
