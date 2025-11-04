@@ -1,21 +1,15 @@
-# This is the improved testing scraping logic
 import utils as newImp
+from news_feeds import ingest_all_feeds
 
-newImp.articleToDB("NewsArticles.db")   # just the db_name
-newImp.quick_dbcheck()
+def run_scrape_and_push():
+    # scrape from Finnhub, fetch full text, classify with FinBERT, upsert into Supabase
+    newImp.articleToSupabase()
 
+    # scrape from RSS feeds (BusinessWire, PR Newswire, etc.), fetch full text, classify with FinBERT, upsert into Supabase
+    ingest_all_feeds()
+
+    # sanity check Supabase row counts
+    newImp.quick_dbcheck()
 
 if __name__ == "__main__":
-    # 1) One-shot fetch+extract+insert (uses robust HTML fetch + fallbacks)
-    newImp.articleToDB(db_name="NewsArticles")
-
-    # 2) (Optional) Retry any rows that inserted with empty full_text or fetch errors
-    #    Useful if some sites throttled you the first pass.
-    try:
-        newImp.refetch_failures(db_name="NewsArticles", limit=200)
-    except AttributeError:
-        # If you didn't add refetch_failures yet, you can ignore this.
-        pass
-
-    # 3) Quick sanity check
-    newImp.quick_dbcheck()
+    run_scrape_and_push()

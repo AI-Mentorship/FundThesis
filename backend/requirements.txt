@@ -11,8 +11,8 @@ trafilatura
 newspaper3k
 finnhub-python
 lxml
-
-
+feedparser
+supabase
 
 #forecasting
 prophet
@@ -22,8 +22,10 @@ statsmodels
 matplotlib
 xgboost
 scikit-learn
-sklearn# Add PyTorch for GPU with CUDA 11.8
-torch==2.0.1+cu118 --index-url https://download.pytorch.org/whl/cu118
+
+# PyTorch - install with CUDA support separately if needed:
+# pip install torch==2.0.1+cu118 --index-url https://download.pytorch.org/whl/cu118
+torch
 
 # Add Transformers library
 transformers

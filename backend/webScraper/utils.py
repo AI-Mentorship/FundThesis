@@ -5,7 +5,7 @@ import time
 import sqlite3
 from urllib.parse import urlparse, urljoin
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from readability import Document
@@ -33,6 +33,14 @@ MIN_WORDS = 150
 
 load_dotenv()
 API_KEY = os.getenv("FINNHUB_KEY")
+
+#SUPABASE setup
+from supabase import create_client, Client
+
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_SERVICE_ROLE = os.environ["SUPABASE_SERVICE_ROLE"]  # DO NOT expose this to frontend
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE)
+
 
 # ---------- HTTP session with headers & retries ----------
 def make_session():
@@ -64,48 +72,20 @@ def finn_client():
         raise RuntimeError("FINNHUB_KEY not set in env")
     return finnhub.Client(api_key=API_KEY)
 
-# ---------- Database ----------
-def setup_database(db_name: str):
-    global connection, cursor
-    BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # goes up from webscraper to backend
-    DB_PATH = os.path.join(BASE_DIR, "db", "NewsArticles.db")
+#Helper for converting epoch to timestamptz string
+def epoch_to_iso(epoch_val):
+    """Convert UNIX seconds -> ISO string with UTC tzinfo, or None."""
+    if epoch_val is None:
+        return None
+    try:
+        ts = int(epoch_val)
+        dt = datetime.fromtimestamp(ts, timezone.utc)
+        return dt.isoformat()
+    except Exception:
+        return None
 
-    connection = sqlite3.connect(DB_PATH)
-    cursor = connection.cursor()
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS articles(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        article_id INTEGER,
-        category TEXT,
-        datetime INTEGER,
-        headline TEXT,
-        related TEXT,
-        source TEXT,
-        summary TEXT,
-        full_text TEXT,
-        url TEXT,
-        label TEXT,
-        inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-    cursor.execute("""
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_article_id
-    ON articles(article_id)
-    """)
-    # Optional aux columns for reliability/debug (ignore if they exist)
-    try:
-        cursor.execute("ALTER TABLE articles ADD COLUMN fetch_status TEXT")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        cursor.execute("ALTER TABLE articles ADD COLUMN fetch_error TEXT")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        cursor.execute("ALTER TABLE articles ADD COLUMN source_domain TEXT")
-    except sqlite3.OperationalError:
-        pass
-    connection.commit()
+
+
 
 # ---------- Extractors ----------
 def extract_trafilatura(html: str) -> str | None:
@@ -282,48 +262,101 @@ def get_fulltext(url: str) -> tuple[str|None, str|None, str|None, int|None, dict
 
 
 # ---------- Insert ----------
-def insert_intoDB(article_db: dict, text: str|None, status: str, error: str|None, http_status: int|None, meta: dict):
-    finb_summaryinp = article_db.get('summary')
-    into_label = run_finbert(finb_summaryinp)
-    domain = None
+#Inserting articles into supabase
+def insert_into_supabase(article_db: dict,
+                         text: str | None,
+                         status: str,
+                         error: str | None,
+                         http_status: int | None,
+                         meta: dict):
+    """
+    article_db: generic "news item"
+    We'll gracefully handle different shapes (Finnhub, SEC, etc.)
+    """
+
+    # --- 1. Sentiment source ---
+    finb_input = (
+        article_db.get('summary')
+        or article_db.get('headline')
+        or ""
+    )
+    into_label = run_finbert(finb_input) if finb_input else None
+
+    # --- 2. Domain extraction ---
     try:
-        domain = urlparse(article_db['url']).netloc
+        domain = urlparse(article_db.get('url', '')).netloc or None
     except Exception:
-        pass
-    cursor.execute("""
-        INSERT OR IGNORE INTO articles
-        (article_id, category, datetime, headline, related, source, summary, full_text, url, label, fetch_status, fetch_error, source_domain)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        article_db.get('id'),
-        article_db.get('category'),
-        article_db.get('datetime'),
-        article_db.get('headline'),
-        article_db.get('related'),
-        article_db.get('source'),
-        article_db.get('summary'),
-        text,
-        meta.get("best_url") or article_db.get('url'),
-        into_label,
-        f"{status}:{http_status}|{meta.get('used_extractor')}|html={meta.get('html_len')}",
-        error,
-        domain
-    ))
+        domain = None
+
+    # --- 3. Normalize published_at ---
+    published_raw = article_db.get('datetime')
+    published_iso = None
+
+    # Case 1: it's epoch-like (e.g. 1698432000)
+    if isinstance(published_raw, (int, float)) or (isinstance(published_raw, str) and published_raw.isdigit()):
+        published_iso = epoch_to_iso(published_raw)
+
+    # Case 2: it's already ISO-ish string like "2025-10-27T13:12:00+00:00" or "...Z"
+    elif isinstance(published_raw, str):
+        try:
+            dt = datetime.fromisoformat(published_raw.replace("Z", "+00:00"))
+            published_iso = dt.astimezone(timezone.utc).isoformat()
+        except Exception:
+            published_iso = None
+
+    # --- 4. Build payload base ---
+    payload = {
+        "category": article_db.get('category'),
+        "published_at": published_iso,
+        "headline": article_db.get('headline'),
+        "related": article_db.get('related'),
+        "source": article_db.get('source'),
+        "summary": article_db.get('summary'),
+        "full_text": text,
+        "url": meta.get("best_url") or article_db.get('url'),
+        "label": into_label,
+        "inserted_at": datetime.now(timezone.utc).isoformat(),
+        "fetch_status": f"{status}:{http_status}|{meta.get('used_extractor')}|html={meta.get('html_len')}",
+        "fetch_error": error,
+        "source_domain": domain
+    }
+
+    # --- 5. ONLY add sqlite_id/article_id if they look numeric ---
+    art_id = article_db.get('id')
+    if isinstance(art_id, (int, float)) or (isinstance(art_id, str) and art_id.isdigit()):
+        payload["sqlite_id"] = art_id
+        payload["article_id"] = art_id
+    # else: skip those fields so Postgres doesn't try to coerce
+
+    # --- 6. Upsert ---
+    res = supabase.table("articles").upsert(payload, on_conflict="url").execute()
+    return res
 
 
 # ---------- Pipeline ----------
-def articleToDB(db_name: str = "fundthesis"):
-    setup_database(db_name)
+def articleToSupabase():
     finc = finn_client()
     news = finc.general_news('general', min_id=0)
 
     inserted = 0
     for art in news:
+        # get article body by scraping the URL
         text, status, error, http_status, meta = get_fulltext(art['url'])
-        insert_intoDB(art, text, status, error, http_status, meta)
+
+        # push 1 row into Supabase
+        insert_into_supabase(
+            article_db=art,
+            text=text,
+            status=status,
+            error=error,
+            http_status=http_status,
+            meta=meta
+        )
+
         inserted += 1
-    connection.commit()
-    print(f"Inserted {inserted} articles")
+
+    print(f"Inserted {inserted} articles into Supabase")
+
 
 #-------------FinBert-------------
 def run_finbert(summ_of_article):
@@ -333,6 +366,17 @@ def run_finbert(summ_of_article):
 
 
 def quick_dbcheck():
-    cursor.execute("SELECT COUNT(*), SUM(CASE WHEN full_text IS NULL OR TRIM(full_text)='' THEN 1 ELSE 0 END) FROM articles")
-    total, empties = cursor.fetchone()
-    print(f"Total rows: {total} | Empty full_text: {empties}")
+    # total rows
+    total_res = supabase.table("articles").select("id").execute()
+    total_rows = len(total_res.data)
+
+    # rows with missing/blank full_text
+    empty_res = supabase.table("articles") \
+        .select("id, full_text") \
+        .or_("full_text.is.null,full_text.eq.") \
+        .execute()
+    empty_rows = len(empty_res.data)
+
+    print(f"Total rows in Supabase: {total_rows} | Empty full_text: {empty_rows}")
+
+
