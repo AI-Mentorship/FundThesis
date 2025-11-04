@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { StockCardStack } from '@/components/StockCard'
 
 interface Stock {
@@ -53,42 +53,7 @@ function DiscoverPage() {
     fetchStocks(0) 
   }, [])
 
-  // Fetch stock details when currentIndex changes
-  useEffect(() => {
-    const currentSymbol = stocks[currentIndex]?.symbol
-    console.log('📊 Current index changed:', currentIndex, 'Symbol:', currentSymbol)
-    if (currentSymbol && !stockDetails[currentSymbol]) {
-      console.log('🔍 Fetching details for:', currentSymbol)
-      fetchStockDetail(currentSymbol)
-    }
-  }, [currentIndex, stocks])
-
-  // Refetch stock details when timeframe changes
-  useEffect(() => { 
-    const currentSymbol = stocks[currentIndex]?.symbol
-    console.log('⏰ Timeframe changed to:', timeframe, 'for symbol:', currentSymbol)
-    if (currentSymbol) fetchStockDetail(currentSymbol)
-  }, [timeframe])
-
-  const fetchStocks = async (offset: number) => {
-    try {
-      offset === 0 ? setLoading(true) : setLoadingMore(true)
-      console.log('📡 Fetching stocks from API...')
-      const res = await fetch(`${API_URL}/api/stocks?limit=20&offset=${offset}`)
-      const data = await res.json()
-      console.log('✅ Stocks received:', data.stocks.length)
-      const mapped = data.stocks.map((s: any) => ({ ...s, company: `${s.symbol} Inc.` }))
-      setStocks(prev => offset === 0 ? mapped : [...prev, ...mapped])
-      setHasMore(data.hasMore)
-    } catch (err) {
-      console.error('❌ Error fetching stocks:', err)
-    } finally {
-      setLoading(false)
-      setLoadingMore(false)
-    }
-  }
-
-  const fetchStockDetail = async (symbol: string) => {
+  const fetchStockDetail = useCallback(async (symbol: string) => {
     try {
       const days = timeframe === 'day' ? 7 : timeframe === 'month' ? 30 : 365
       console.log(`📡 Fetching details for ${symbol} (${days} days)...`)
@@ -123,6 +88,54 @@ function DiscoverPage() {
       }))
     } catch (err) {
       console.error(`❌ Error fetching ${symbol}:`, err)
+    }
+  }, [timeframe])
+
+  // Fetch stock details when currentIndex changes
+  useEffect(() => {
+    const currentSymbol = stocks[currentIndex]?.symbol
+    console.log('📊 Current index changed:', currentIndex, 'Symbol:', currentSymbol)
+    if (currentSymbol && !stockDetails[currentSymbol]) {
+      console.log('🔍 Fetching details for:', currentSymbol)
+      fetchStockDetail(currentSymbol)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, stocks, fetchStockDetail])
+
+  // Refetch stock details when timeframe changes
+  useEffect(() => { 
+    const currentSymbol = stocks[currentIndex]?.symbol
+    console.log('⏰ Timeframe changed to:', timeframe, 'for symbol:', currentSymbol)
+    if (currentSymbol) {
+      fetchStockDetail(currentSymbol)
+    }
+  }, [timeframe, currentIndex, stocks, fetchStockDetail])
+
+  const fetchStocks = async (offset: number) => {
+    try {
+      if (offset === 0) {
+        setLoading(true)
+      } else {
+        setLoadingMore(true)
+      }
+      console.log('📡 Fetching stocks from API...')
+      const res = await fetch(`${API_URL}/api/stocks?limit=20&offset=${offset}`)
+      const data = await res.json()
+      console.log('✅ Stocks received:', data.stocks.length)
+      interface ApiStock {
+        symbol: string
+        price: number
+        change: number
+        changePercent: number
+      }
+      const mapped = data.stocks.map((s: ApiStock) => ({ ...s, company: `${s.symbol} Inc.` }))
+      setStocks(prev => offset === 0 ? mapped : [...prev, ...mapped])
+      setHasMore(data.hasMore)
+    } catch (err) {
+      console.error('❌ Error fetching stocks:', err)
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
     }
   }
 
@@ -173,7 +186,6 @@ function DiscoverPage() {
           setTimeframe={setTimeframe}
           loadingMore={loadingMore}
           checkAndLoadMore={checkAndLoadMore}
-          fetchStockDetail={fetchStockDetail}
         />
       </div>
     </main>

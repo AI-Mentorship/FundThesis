@@ -4,6 +4,9 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
+// Prevent static generation since this page requires client-side auth
+export const dynamic = 'force-dynamic';
+
 export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
