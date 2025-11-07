@@ -38,17 +38,17 @@ const StockTicker = () => {
   }, [])
 
   return (
-    <div className="ticker-bg text-white py-0.5 overflow-hidden">
+    <div className="ticker-bg bg-gray-100 text-black py-0.5 overflow-hidden">
       <div className="animate-marquee-fast whitespace-nowrap">
         <div className="inline-flex space-x-8">
           {stocks.concat(stocks).map((stock, index) => (
             <div key={`${stock.symbol}-${index}`} className="inline-flex items-center space-x-2 text-sm">
               <span className="font-semibold">{stock.symbol}</span>
-              <span>${stock.price.toFixed(2)}</span>
-              <span className={`${stock.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <span className="">${stock.price.toFixed(2)}</span>
+              <span className={`${stock.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}
               </span>
-              <span className={`${stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <span className={`${stock.changePercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 ({stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%)
               </span>
             </div>
