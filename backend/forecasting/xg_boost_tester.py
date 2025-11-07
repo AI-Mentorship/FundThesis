@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import RobustScaler  # ADD THIS LINE
-
+    
 
 def train_test_split(data, perc):  # trains with the first perc of the data and tests with the rest
     n = int(len(data) * (1 - perc))
@@ -41,95 +41,97 @@ def xgb_predict(train, test):
     return y_pred, y_test, model
 
 
-df = pd.read_csv('data/example_data.csv')
+if __name__=='__main__':
 
-new_df = df.copy()
+    df = pd.read_csv('data/example_data.csv')
 
-# Add technical indicators
-df['SMA_10'] = df['Close'].rolling(10).mean()
-df['SMA_30'] = df['Close'].rolling(30).mean()
-df['Volatility'] = df['Close'].rolling(10).std()
-df['Volume_MA'] = df['Volume'].rolling(10).mean()
+    new_df = df.copy()
 
-df['target'] = df['Close'].shift(-1)
+    # Add technical indicators
+    df['SMA_10'] = df['Close'].rolling(10).mean()
+    df['SMA_30'] = df['Close'].rolling(30).mean()
+    df['Volatility'] = df['Close'].rolling(10).std()
+    df['Volume_MA'] = df['Volume'].rolling(10).mean()
 
-df.dropna(inplace=True)  # cuz shifting everything creates some null values
-training_df = df.copy()
+    df['target'] = df['Close'].shift(-1)
 
-print("Original data sample:")
-print(training_df.head())
+    df.dropna(inplace=True)  # cuz shifting everything creates some null values
+    training_df = df.copy()
 
-train_constant = 0.5  # subject to explosive change
+    print("Original data sample:")
+    print(training_df.head())
 
-training_df = training_df.drop(columns=["Unnamed: 0", "Date", "Stock Splits", "Dividends"])
+    train_constant = 0.5  # subject to explosive change
 
-# DEBUGGING AND FEATURE SCALING SECTION
-print(f"\nDataset shape: {training_df.shape}")
-print(f"Columns: {training_df.columns.tolist()}")
+    training_df = training_df.drop(columns=["Unnamed: 0", "Date", "Stock Splits", "Dividends"])
 
-print("\nBefore scaling - feature statistics:")
-feature_cols = [col for col in training_df.columns if col != 'target']
-print(f"Feature columns: {feature_cols}")
-print(training_df[feature_cols].describe())
+    # DEBUGGING AND FEATURE SCALING SECTION
+    print(f"\nDataset shape: {training_df.shape}")
+    print(f"Columns: {training_df.columns.tolist()}")
 
-# Check for any issues with the data
-print(f"\nAny NaN values: {training_df.isnull().sum().sum()}")
-print(f"Any infinite values: {np.isinf(training_df[feature_cols]).sum().sum()}")
+    print("\nBefore scaling - feature statistics:")
+    feature_cols = [col for col in training_df.columns if col != 'target']
+    print(f"Feature columns: {feature_cols}")
+    print(training_df[feature_cols].describe())
 
-# Split into train/test FIRST (to avoid leakage)
-train, test = train_test_split(training_df, train_constant)
+    # Check for any issues with the data
+    print(f"\nAny NaN values: {training_df.isnull().sum().sum()}")
+    print(f"Any infinite values: {np.isinf(training_df[feature_cols]).sum().sum()}")
 
-# Scale features cuz everything was innaccurate
-scaler = RobustScaler()
-train[feature_cols] = scaler.fit_transform(train[feature_cols])   # fit only on train
-test[feature_cols] = scaler.transform(test[feature_cols])         # apply on test
+    # Split into train/test FIRST (to avoid leakage)
+    train, test = train_test_split(training_df, train_constant)
 
-print("\nAfter scaling - feature statistics (train):")
-print(train[feature_cols].describe())
+    # Scale features cuz everything was innaccurate
+    scaler = RobustScaler()
+    train[feature_cols] = scaler.fit_transform(train[feature_cols])   # fit only on train
+    test[feature_cols] = scaler.transform(test[feature_cols])         # apply on test
 
-print("\nAfter scaling - feature statistics (test):")
-print(test[feature_cols].describe())
+    print("\nAfter scaling - feature statistics (train):")
+    print(train[feature_cols].describe())
 
-# Check if scaling actually worked
-print(f"\nFeature means after scaling (train): {train[feature_cols].mean().values}")
-print(f"Feature stds after scaling (train): {train[feature_cols].std().values}")
+    print("\nAfter scaling - feature statistics (test):")
+    print(test[feature_cols].describe())
 
-print("\nScaled data sample (train):")
-print(train.head())
+    # Check if scaling actually worked
+    print(f"\nFeature means after scaling (train): {train[feature_cols].mean().values}")
+    print(f"Feature stds after scaling (train): {train[feature_cols].std().values}")
 
-# Additional debugging - check target variable
-print(f"\nTarget variable stats:")
-print(f"Min: {training_df['target'].min()}, Max: {training_df['target'].max()}")
-print(f"Mean: {training_df['target'].mean()}, Std: {training_df['target'].std()}")
-# END OF SCALING SECTION
+    print("\nScaled data sample (train):")
+    print(train.head())
 
-# predict using the function
-y_pred, y_test, model = xgb_predict(train, test)
+    # Additional debugging - check target variable
+    print(f"\nTarget variable stats:")
+    print(f"Min: {training_df['target'].min()}, Max: {training_df['target'].max()}")
+    print(f"Mean: {training_df['target'].mean()}, Std: {training_df['target'].std()}")
+    # END OF SCALING SECTION
 
-mse = mean_squared_error(y_test, y_pred)
-r2 = r2_score(y_test, y_pred)
+    # predict using the function
+    y_pred, y_test, model = xgb_predict(train, test)
 
-print("\nModel Performance:")
-print("Test MSE:", mse)
-print("Test R2:", r2)
+    mse = mean_squared_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
 
-plt.figure(figsize=(12, 6))
+    print("\nModel Performance:")
+    print("Test MSE:", mse)
+    print("Test R2:", r2)
 
-# Plot actual closing prices
-plt.plot(y_test, label="Actual Close", color='blue', linewidth=2)
+    plt.figure(figsize=(12, 6))
 
-# Plot predicted closing prices
-plt.plot(y_pred, label="Predicted Close", color='orange', linestyle='--', linewidth=2)
+    # Plot actual closing prices
+    plt.plot(y_test, label="Actual Close", color='blue', linewidth=2)
 
-# Add title and labels
-plt.title("Actual vs Predicted Close Prices", fontsize=16)
-plt.xlabel("Time Step", fontsize=14)
-plt.ylabel("Close Price", fontsize=14)
+    # Plot predicted closing prices
+    plt.plot(y_pred, label="Predicted Close", color='orange', linestyle='--', linewidth=2)
 
-# Show legend
-plt.legend(fontsize=12)
+    # Add title and labels
+    plt.title("Actual vs Predicted Close Prices", fontsize=16)
+    plt.xlabel("Time Step", fontsize=14)
+    plt.ylabel("Close Price", fontsize=14)
 
-# Optional: add grid
-plt.grid(True, linestyle='--', alpha=0.5)
+    # Show legend
+    plt.legend(fontsize=12)
 
-plt.show()
+    # Optional: add grid
+    plt.grid(True, linestyle='--', alpha=0.5)
+
+    plt.show()
