@@ -1,6 +1,6 @@
 # Fundthesis
 
-AI-Powered Financial Education Platform  
+AI-Powered Financial Education Platform
 By: Ali Benrami and Hasnain Niazi
 
 ## Overview

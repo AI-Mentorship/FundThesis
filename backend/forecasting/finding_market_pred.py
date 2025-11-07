@@ -63,6 +63,6 @@ stock_data.to_csv("data/example_data.csv")
 
 # forecasting_results = get_forecasting_prediction(stock_data, 30)
 
-# plot_forecast(stock_data, 
-#               arima_forecast=forecasting_results['ARIMA'], 
+# plot_forecast(stock_data,
+#               arima_forecast=forecasting_results['ARIMA'],
 #               prophet_forecast=forecasting_results['Prophet'])

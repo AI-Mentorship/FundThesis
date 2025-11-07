@@ -1,4 +1,4 @@
-#This is the newscraper functions that Im testing out to see if I can get more optimal scraping 
+#This is the newscraper functions that Im testing out to see if I can get more optimal scraping
 
 import os
 import time
@@ -166,7 +166,7 @@ def _extract_newspaper(url: str, html: str|None) -> str|None:
         return art.text.strip() if art.text else None
     except Exception:
         return None
-    
+
 def _extract_readability(html: str) -> str|None:
     try:
         doc = Document(html)

@@ -2,10 +2,14 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useSession, authClient } from '@/lib/auth-client'
 
 const Navbar = () => {
   const pathname = usePathname()
+  const router = useRouter()
+  const { data, isLoading } = useSession()
+  const isAuthenticated = !!data?.session
 
   const navItems = [
     { name: 'Dashboard', href: '/dashboard' },
@@ -15,6 +19,12 @@ const Navbar = () => {
     { name: 'LearnThesis', href: '/learn' },
     { name: 'EnviroThesis', href: '/enviro' },
   ]
+
+  const handleSignOut = async () => {
+    await authClient.signOut()
+    router.push('/')
+    router.refresh()
+  }
 
   return (
     <nav className="bg-white border-b border-gray-200 px-4 py-5">
@@ -26,35 +36,66 @@ const Navbar = () => {
           </Link>
         </div>
 
-        {/* Navigation Items */}
-        <div className="hidden md:flex items-center space-x-8">
-          {navItems.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`text-sm font-medium transition-colors hover:text-gray-600 ${
-                pathname === item.href
-                  ? 'text-black border-b-2 border-black pb-1'
-                  : 'text-gray-500'
-              }`}
-            >
-              {item.name}
-            </Link>
-          ))}
-        </div>
+        {/* Navigation Items - Only show if authenticated */}
+        {isAuthenticated && (
+          <div className="hidden md:flex items-center space-x-8">
+            {navItems.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`text-sm font-medium transition-colors hover:text-gray-600 ${
+                  pathname === item.href
+                    ? 'text-black border-b-2 border-black pb-1'
+                    : 'text-gray-500'
+                }`}
+              >
+                {item.name}
+              </Link>
+            ))}
+          </div>
+        )}
 
-        {/* Profile */}
-        <div className="flex items-center">
-          <Link
-            href="/profile"
-            className={`text-sm font-medium transition-colors hover:text-gray-600 ${
-              pathname === '/profile'
-                ? 'text-black border-b-2 border-black pb-1'
-                : 'text-gray-500'
-            }`}
-          >
-            Profile
-          </Link>
+        {/* Auth Buttons */}
+        <div className="flex items-center space-x-4">
+          {!isLoading && (
+            <>
+              {isAuthenticated ? (
+                <>
+                  <Link
+                    href="/profile"
+                    className={`text-sm font-medium transition-colors hover:text-gray-600 ${
+                      pathname === '/profile'
+                        ? 'text-black border-b-2 border-black pb-1'
+                        : 'text-gray-500'
+                    }`}
+                  >
+                    Profile
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="text-sm font-medium text-gray-500 hover:text-gray-600 transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="text-sm font-medium text-gray-500 hover:text-gray-600 transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="text-sm font-medium bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition-colors"
+                  >
+                    Sign Up
+                  </Link>
+                </>
+              )}
+            </>
+          )}
         </div>
 
         {/* Mobile Menu Button */}

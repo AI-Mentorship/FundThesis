@@ -11,7 +11,7 @@ def ping():
 def read_dashboard():
     return{"Welcome to dashboard"}
 
-@router.get("/roulette")# for the roulette page where 
+@router.get("/roulette")# for the roulette page where
 def gamble():
     return {"Put your life savings into NMAX"}#Put nmax in there cuz it lost most money in the year
 

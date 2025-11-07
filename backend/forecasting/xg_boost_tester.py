@@ -4,7 +4,7 @@ import os
 import matplotlib.pyplot as plt
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.preprocessing import RobustScaler  # ADD THIS LINE
+from sklearn.preprocessing import RobustScaler
 
 
 def train_test_split(data, perc):  # trains with the first perc of the data and tests with the rest
@@ -30,7 +30,7 @@ def xgb_predict(train, test):
         reg_lambda=0.01,    # Much less regularization
         random_state=42
     )
-    
+
     model.fit(
         X, Y,
         eval_set=[(X_test, y_test)],

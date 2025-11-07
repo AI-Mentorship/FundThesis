@@ -24,7 +24,7 @@ const StockTicker = () => {
   // Simulate real-time updates
   useEffect(() => {
     const interval = setInterval(() => {
-      setStocks(prevStocks => 
+      setStocks(prevStocks =>
         prevStocks.map(stock => ({
           ...stock,
           price: stock.price + (Math.random() - 0.5) * 2,

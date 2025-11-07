@@ -2,7 +2,7 @@
 fastapi
 uvicorn
 
-# webscraper 
+# webscraper
 python-dotenv
 beautifulsoup4
 readability-lxml
