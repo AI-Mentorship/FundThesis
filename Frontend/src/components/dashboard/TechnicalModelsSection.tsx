@@ -125,8 +125,30 @@ export function TechnicalModelsSection({ className = "" }: TechnicalModelsSectio
                     }}
                   />
                   <YAxis 
+                    domain={(() => {
+                      if (predictions.length === 0) return ['auto', 'auto']
+                      
+                      const prices = predictions
+                        .map(p => p.predictedPrice)
+                        .filter(p => p != null && !isNaN(p) && p > 0)
+                      
+                      if (prices.length === 0) return ['auto', 'auto']
+                      
+                      const minPrice = Math.min(...prices)
+                      const maxPrice = Math.max(...prices)
+                      const range = maxPrice - minPrice
+                      
+                      // Add 10% padding on each side, but ensure we show fluctuations
+                      // If range is very small, use a minimum range of 2% of the average price
+                      const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length
+                      const minRange = avgPrice * 0.02 // 2% minimum range
+                      
+                      const padding = Math.max(range * 0.1, minRange / 2)
+                      
+                      return [minPrice - padding, maxPrice + padding]
+                    })()}
                     tick={{ fontSize: 12 }}
-                    tickFormatter={(value) => `$${value.toFixed(0)}`}
+                    tickFormatter={(value) => `$${value.toFixed(2)}`}
                   />
                   <Tooltip 
                     formatter={(value: number) => [`$${value.toFixed(2)}`, 'Predicted Price']}
