@@ -1,8 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Navbar from '../../components/Navbar';
-import StockTicker from '../../components/StockTicker';
+ 
 import { getProgress } from '../lessonmodules/data/userProgress';
 import ProgressRing from '../lessonmodules/components/ProgressRing';
 
@@ -74,16 +73,13 @@ const LearnPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
+      {/* StockTicker is rendered globally in RootLayout */}
 
-      {/* real stock ticker component */}
-      <StockTicker />
-
-      <main className="max-w-6xl mx-auto p-6">
-        <section className="bg-white rounded-lg shadow p-8 mb-8">
-          <h1 className="text-3xl font-bold mb-2">Placeholder hero title</h1>
-          <p className="text-gray-600">This is a short introduction to the Learn modules. Two to three lines of subtext go here to describe the learning path and what to expect.</p>
-        </section>
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-4xl font-bold text-gray-900 mb-1">LearnThesis</h1>
+          <p className="text-lg text-gray-600">Learn and master the fundamentals of investing step-by-step through interactive modules</p>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-9">

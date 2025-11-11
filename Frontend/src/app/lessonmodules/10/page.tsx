@@ -1,11 +1,9 @@
 "use client";
 import React, { useEffect, useMemo, useState } from 'react';
 import { StockModel, TradeResult } from '../lib/stockModel';
-import Navbar from '../../../components/Navbar';
 import ModNav from '../components/ModNav';
-import StockTicker from '../../../components/StockTicker';
 import questionsByModule, { getQuestions } from '../data/moduleQuestions';
-import Confetti from '../../../components/Confetti';
+import Confetti from '../components/Confetti';
 // DecisionQuiz is defined in this file for the Module X assessment
 type Decision = 'BUY' | 'SELL' | 'HOLD' | null;
 
@@ -169,10 +167,8 @@ const Module10: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
 
-      {/* real stock ticker (demo moved to Module 10) */}
-      <StockTicker />
+      {/* StockTicker rendered globally via RootLayout */}
 
       <ModNav moduleIndex={10} totalModules={10} title="Demo" />
 
@@ -252,7 +248,7 @@ const Module10: React.FC = () => {
 
               {/* feedback area & controls */}
               <div className="space-y-4">
-                <Confetti active={confettiActive} />
+                {confettiActive && <Confetti />}
                 {decisionState.scenarios[decisionState.currentIndex] ? (
                   <div>
                     <div className="text-sm text-gray-700 mb-2">Read the news on the right, then use the trading panel to choose Buy or Sell for this scenario.</div>

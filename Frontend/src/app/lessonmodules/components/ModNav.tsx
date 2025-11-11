@@ -68,7 +68,9 @@ const ModNav: React.FC<Props> = ({ moduleIndex, totalModules, title }) => {
               <>
                 <div className="text-sm text-gray-500">{`Module ${label}`}</div>
                 <div className="text-lg font-semibold text-gray-900">{title ?? `Module ${label}`}</div>
-                <div className="text-sm text-gray-500 mt-1">{`${counts.answered} / ${counts.total}`}</div>
+                {moduleIndex !== 10 && (
+                  <div className="text-sm text-gray-500 mt-1">{`${counts.answered} / ${counts.total}`}</div>
+                )}
               </>
             );
           })()}
