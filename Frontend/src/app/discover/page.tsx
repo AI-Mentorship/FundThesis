@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { StockCardStack } from '@/components/StockCard'
+import { Search, X } from 'lucide-react'
 
 interface Stock {
   symbol: string
@@ -32,6 +33,8 @@ interface StockDetail {
   fiftyTwoWeekLow?: number
   peRatio?: number
   sector: string
+  industry: string
+  marketCap: number
   chartData: StockDetailPoint[]
   forecastData?: StockDetailPoint[]
 }
@@ -46,12 +49,33 @@ function DiscoverPage() {
   const [hasMore, setHasMore] = useState(true)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [timeframe, setTimeframe] = useState<'day' | 'month' | 'year'>('month')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filteredStocks, setFilteredStocks] = useState<Stock[]>([])
 
   // Fetch initial stocks
   useEffect(() => { 
     console.log('🚀 Fetching initial stocks...')
     fetchStocks(0) 
   }, [])
+
+  // Filter stocks based on search query
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredStocks(stocks)
+    } else {
+      const query = searchQuery.toLowerCase()
+      const filtered = stocks.filter(
+        (stock) =>
+          stock.symbol.toLowerCase().includes(query) ||
+          stock.company.toLowerCase().includes(query)
+      )
+      setFilteredStocks(filtered)
+      // Reset to first stock when search changes
+      if (filtered.length > 0) {
+        setCurrentIndex(0)
+      }
+    }
+  }, [searchQuery, stocks])
 
   const fetchStockDetail = useCallback(async (symbol: string) => {
     try {
@@ -93,23 +117,23 @@ function DiscoverPage() {
 
   // Fetch stock details when currentIndex changes
   useEffect(() => {
-    const currentSymbol = stocks[currentIndex]?.symbol
+    const currentSymbol = filteredStocks[currentIndex]?.symbol
     console.log('📊 Current index changed:', currentIndex, 'Symbol:', currentSymbol)
     if (currentSymbol && !stockDetails[currentSymbol]) {
       console.log('🔍 Fetching details for:', currentSymbol)
       fetchStockDetail(currentSymbol)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, stocks, fetchStockDetail])
+  }, [currentIndex, filteredStocks, fetchStockDetail])
 
   // Refetch stock details when timeframe changes
   useEffect(() => { 
-    const currentSymbol = stocks[currentIndex]?.symbol
+    const currentSymbol = filteredStocks[currentIndex]?.symbol
     console.log('⏰ Timeframe changed to:', timeframe, 'for symbol:', currentSymbol)
     if (currentSymbol) {
       fetchStockDetail(currentSymbol)
     }
-  }, [timeframe, currentIndex, stocks, fetchStockDetail])
+  }, [timeframe, currentIndex, filteredStocks, fetchStockDetail])
 
   const fetchStocks = async (offset: number) => {
     try {
@@ -140,10 +164,15 @@ function DiscoverPage() {
   }
 
   const checkAndLoadMore = (idx: number) => {
-    if (!loadingMore && hasMore && idx >= stocks.length - 5) {
+    if (!loadingMore && hasMore && idx >= filteredStocks.length - 5) {
       console.log('📥 Loading more stocks...')
       fetchStocks(stocks.length)
     }
+  }
+
+  const clearSearch = () => {
+    setSearchQuery('')
+    setCurrentIndex(0)
   }
 
   if (loading) {
@@ -156,7 +185,7 @@ function DiscoverPage() {
     )
   }
 
-  const currentSymbol = stocks[currentIndex]?.symbol
+  const currentSymbol = filteredStocks[currentIndex]?.symbol
   const stockDetail = currentSymbol ? stockDetails[currentSymbol] : undefined
   const combinedChartData = [
     ...(stockDetail?.chartData ?? []),
@@ -174,20 +203,63 @@ function DiscoverPage() {
   return (
     <main className="max-w-7xl mx-auto px-4 py-2">
       <h1 className="text-4xl font-bold text-gray-900 mb-1">Discover Stocks</h1>
-      <p className="text-lg text-gray-600 mb-2">Explore trending stocks with our interactive card viewer</p>
-      <div className="py-2">
-        <StockCardStack 
-          stocks={stocks}
-          stockDetails={stockDetails}
-          combinedChartData={combinedChartData} 
-          currentIndex={currentIndex}
-          setCurrentIndex={setCurrentIndex}
-          timeframe={timeframe}
-          setTimeframe={setTimeframe}
-          loadingMore={loadingMore}
-          checkAndLoadMore={checkAndLoadMore}
-        />
+      <p className="text-lg text-gray-600 mb-4">Explore trending stocks with our interactive card viewer</p>
+      
+      {/* Search Bar */}
+      <div className="mb-6 max-w-2xl mx-auto">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by stock symbol or company name..."
+            className="w-full pl-12 pr-12 py-3 text-lg border-2 border-gray-300 rounded-xl focus:border-[#9DB38A] focus:outline-none focus:ring-2 focus:ring-[#9DB38A]/20 transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={clearSearch}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="mt-2 text-sm text-gray-600 text-center">
+            Found {filteredStocks.length} stock{filteredStocks.length !== 1 ? 's' : ''} matching "{searchQuery}"
+          </p>
+        )}
       </div>
+
+      {/* Stock Cards */}
+      {filteredStocks.length > 0 ? (
+        <div className="py-2">
+          <StockCardStack 
+            stocks={filteredStocks}
+            stockDetails={stockDetails}
+            combinedChartData={combinedChartData} 
+            currentIndex={currentIndex}
+            setCurrentIndex={setCurrentIndex}
+            timeframe={timeframe}
+            setTimeframe={setTimeframe}
+            loadingMore={loadingMore}
+            checkAndLoadMore={checkAndLoadMore}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-20 text-gray-600">
+          <Search className="w-16 h-16 text-gray-300 mb-4" />
+          <p className="text-xl font-medium">No stocks found</p>
+          <p className="text-sm mt-2">Try searching for a different symbol or company name</p>
+          <button
+            onClick={clearSearch}
+            className="mt-4 px-6 py-2 bg-[#9DB38A] text-white rounded-lg hover:bg-[#8ca279] transition-colors"
+          >
+            Clear Search
+          </button>
+        </div>
+      )}
     </main>
   )
 }
