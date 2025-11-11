@@ -336,16 +336,18 @@ export function StockCardStack({
                             tickFormatter={(value) => `${value}`}
                           />
                           <Tooltip content={<CustomTooltip />} />
-                          {/* Single line that includes all data - recharts handles it automatically */}
+                          {/* Historical line - solid */}
                           <Line
                             type="monotone"
                             dataKey="price"
                             stroke={stock.change >= 0 ? "#9DB38A" : "#c17b7b"}
-                            strokeWidth={2}
+                            strokeWidth={3}
                             dot={false}
                             connectNulls={true}
+                            data={combinedChartData.filter((d) => d.type !== "forecast")}
+                            name="Historical"
                           />
-                          {/* Overlay dashed line only on forecast points */}
+                          {/* Forecast line - dashed and more visible */}
                           {combinedChartData.some(
                             (d) => d.type === "forecast"
                           ) && (
@@ -353,15 +355,12 @@ export function StockCardStack({
                               type="monotone"
                               dataKey="price"
                               stroke="#3b82f6"
-                              strokeWidth={2.5}
-                              strokeDasharray="5 5"
+                              strokeWidth={3}
+                              strokeDasharray="8 4"
                               dot={false}
                               connectNulls={true}
-                              data={combinedChartData.map((d) =>
-                                d.type === "forecast"
-                                  ? d
-                                  : { ...d, price: null }
-                              )}
+                              data={combinedChartData.filter((d) => d.type === "forecast")}
+                              name="Forecast"
                             />
                           )}
                         </LineChart>
@@ -375,14 +374,24 @@ export function StockCardStack({
                   {/* Legend */}
                   {index === currentIndex &&
                     combinedChartData.some((d) => d.type === "forecast") && (
-                      <div className="flex items-center justify-center gap-4 mt-2 text-xs">
-                        <div className="flex items-center gap-1">
-                          <div className="w-4 h-0.5 bg-[#9DB38A]"></div>
-                          <span className="text-gray-600">Historical</span>
+                      <div className="flex items-center justify-center gap-6 mt-3 text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-1.5 bg-[#9DB38A] rounded"></div>
+                          <span className="text-gray-700 font-semibold">Historical</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-4 h-0.5 bg-blue-500 border-dashed border-t-2 border-blue-500"></div>
-                          <span className="text-gray-600">Forecast</span>
+                        <div className="flex items-center gap-2">
+                          <svg width="32" height="6" className="overflow-visible">
+                            <line 
+                              x1="0" 
+                              y1="3" 
+                              x2="32" 
+                              y2="3" 
+                              stroke="#3b82f6" 
+                              strokeWidth="3" 
+                              strokeDasharray="6 3"
+                            />
+                          </svg>
+                          <span className="text-gray-700 font-semibold">Forecast</span>
                         </div>
                       </div>
                     )}

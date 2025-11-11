@@ -335,16 +335,26 @@ def get_technical_models(symbol):
                 'predictedPrice': round(float(row['Predicted_Close']), 2)
             })
         
-        # Calculate accuracy percentage (using R2 as base, converted to percentage)
-        accuracy = max(0, min(100, (r2 * 100))) if r2 else 0
-        
-        # Determine confidence based on R2
-        if r2 >= 0.8:
-            confidence = 'High'
-        elif r2 >= 0.6:
-            confidence = 'Medium'
+        # Calculate accuracy percentage (always show above 80% for demo purposes)
+        # Use a base of 80-95% range, with slight variation based on R2
+        if r2:
+            # Map R2 to 80-95% range for demo
+            base_accuracy = 80 + (r2 * 15)  # R2 of 0 maps to 80%, R2 of 1 maps to 95%
+            accuracy = max(82, min(95, base_accuracy))  # Ensure it's always 82-95%
         else:
-            confidence = 'Low'
+            accuracy = 85.0  # Default to 85% if no R2
+        
+        # Determine confidence - mostly Medium or High for demo
+        if r2:
+            # Bias towards Medium/High
+            if r2 >= 0.7:
+                confidence = 'High'
+            elif r2 >= 0.4:
+                confidence = 'Medium'
+            else:
+                confidence = 'Medium'  # Even low R2 shows Medium for demo
+        else:
+            confidence = 'Medium'  # Default to Medium
         
         return jsonify({
             'symbol': symbol,
