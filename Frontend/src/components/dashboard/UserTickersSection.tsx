@@ -10,6 +10,7 @@ export function UserTickersSection() {
   const [tickers, setTickers] = useState<UserTicker[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null) // Track which ticker symbol is being deleted
   const [newTicker, setNewTicker] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
@@ -55,14 +56,33 @@ export function UserTickersSection() {
     }
   }
 
-  const handleDeleteTicker = async (tickerId: string) => {
-    if (!userId) return
+  const handleDeleteTicker = async (stockTicker: string) => {
+    if (!userId || !stockTicker) {
+      setError('Invalid ticker')
+      return
+    }
+
+    setDeleting(stockTicker)
+    setError(null)
 
     try {
-      await deleteUserTicker(userId, tickerId)
-      setTickers(tickers.filter(t => t.id !== tickerId))
+      // Optimistically update UI
+      setTickers(tickers.filter(t => t.stock_ticker !== stockTicker))
+
+      // Perform actual deletion using user_id and stock_ticker
+      await deleteUserTicker(userId, stockTicker)
+      
+      // Verify deletion was successful by checking if ticker still exists
+      const updatedTickers = await getUserTickers(userId)
+      setTickers(updatedTickers)
     } catch (err: any) {
-      setError(err.message || 'Failed to delete ticker')
+      console.error('Error deleting ticker:', err)
+      // Revert optimistic update on error
+      const userTickers = await getUserTickers(userId)
+      setTickers(userTickers)
+      setError(err.message || 'Failed to delete ticker. Please try again.')
+    } finally {
+      setDeleting(null)
     }
   }
 
@@ -122,21 +142,42 @@ export function UserTickersSection() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {tickers.map((ticker) => (
-              <div
-                key={ticker.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
-              >
-                <span className="font-semibold text-gray-900">{ticker.stock_ticker}</span>
-                <button
-                  onClick={() => ticker.id && handleDeleteTicker(ticker.id)}
-                  className="ml-2 p-1 text-gray-400 hover:text-red-600 transition-colors"
-                  title="Remove ticker"
+            {tickers.map((ticker, index) => {
+              // Use combination of user_id and stock_ticker for unique key
+              const uniqueKey = `${ticker.user_id}-${ticker.stock_ticker}-${index}`
+              const isDeleting = deleting === ticker.stock_ticker
+              return (
+                <div
+                  key={uniqueKey}
+                  className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 transition-colors ${
+                    isDeleting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'
+                  }`}
                 >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
+                  <span className="font-semibold text-gray-900">{ticker.stock_ticker}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (!isDeleting) {
+                        handleDeleteTicker(ticker.stock_ticker)
+                      }
+                    }}
+                    disabled={isDeleting}
+                    className={`ml-2 p-1 transition-colors ${
+                      isDeleting
+                        ? 'text-gray-300 cursor-not-allowed' 
+                        : 'text-gray-400 hover:text-red-600'
+                    }`}
+                    title={isDeleting ? 'Removing...' : 'Remove ticker'}
+                  >
+                    {isDeleting ? (
+                      <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <X size={16} />
+                    )}
+                  </button>
+                </div>
+              )
+            })}
           </div>
         )}
       </CardContent>

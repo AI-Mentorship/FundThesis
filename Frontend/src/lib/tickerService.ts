@@ -1,7 +1,6 @@
 import { supabase } from './supabaseClient';
 
 export interface UserTicker {
-  id?: string;
   user_id: string;
   stock_ticker: string;
   created_at?: string;
@@ -13,7 +12,7 @@ export interface UserTicker {
 export async function getUserTickers(userId: string): Promise<UserTicker[]> {
   const { data, error } = await supabase
     .from('user_account')
-    .select('*')
+    .select('user_id, stock_ticker, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -72,12 +71,38 @@ export async function addUserTicker(userId: string, ticker: string): Promise<Use
 /**
  * Delete a ticker for the current user
  */
-export async function deleteUserTicker(userId: string, tickerId: string): Promise<void> {
+export async function deleteUserTicker(userId: string, stockTicker: string): Promise<void> {
+  if (!stockTicker) {
+    throw new Error('Stock ticker is required');
+  }
+
+  if (!userId) {
+    throw new Error('User ID is required');
+  }
+
+  // First verify the ticker exists and belongs to the user
+  const { data: existing, error: fetchError } = await supabase
+    .from('user_account')
+    .select('user_id, stock_ticker')
+    .eq('user_id', userId)
+    .eq('stock_ticker', stockTicker.toUpperCase().trim())
+    .single();
+
+  if (fetchError) {
+    console.error('Error fetching ticker for deletion:', fetchError);
+    throw new Error('Ticker not found or you do not have permission to delete it');
+  }
+
+  if (!existing) {
+    throw new Error('Ticker not found');
+  }
+
+  // Delete the ticker using user_id and stock_ticker (composite key)
   const { error } = await supabase
     .from('user_account')
     .delete()
-    .eq('id', tickerId)
-    .eq('user_id', userId); // Ensure user can only delete their own tickers
+    .eq('user_id', userId)
+    .eq('stock_ticker', stockTicker.toUpperCase().trim());
 
   if (error) {
     console.error('Error deleting user ticker:', error);

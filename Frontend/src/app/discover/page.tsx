@@ -161,15 +161,22 @@ function DiscoverPage() {
     if (historical.length === 0) return forecast.map(d => ({ ...d, type: 'forecast' as const }))
     if (forecast.length === 0) return historical.map(d => ({ ...d, type: 'historical' as const }))
     
+    // Create a set of historical dates for quick lookup
+    const historicalDates = new Set(historical.map(h => h.date))
+    
     // Get the last historical data point
     const lastHistorical = historical[historical.length - 1]
     const lastHistoricalDate = new Date(lastHistorical.date)
     
-    // Filter forecast to only include dates AFTER the last historical date
-    // This ensures forecast only appears after available stock price ends
+    // Filter forecast to only include:
+    // 1. Dates AFTER the last historical date
+    // 2. Dates that don't exist in historical data (no overlap)
     const futureForecast = forecast.filter(f => {
       const forecastDate = new Date(f.date)
-      return forecastDate > lastHistoricalDate
+      const forecastDateStr = f.date
+      
+      // Must be after last historical date AND not exist in historical data
+      return forecastDate > lastHistoricalDate && !historicalDates.has(forecastDateStr)
     })
     
     if (futureForecast.length === 0) {
@@ -186,14 +193,14 @@ function DiscoverPage() {
         price: lastHistorical.price,
         type: 'forecast' as const
       },
-      // Only future forecast points (after last historical date)
+      // Only future forecast points (after last historical date and not overlapping)
       ...futureForecast.map(f => ({
         ...f,
         type: 'forecast' as const
       }))
     ]
     
-    // Combine: historical + forecast (with bridge, only future dates)
+    // Combine: historical + forecast (with bridge, only future dates with no overlap)
     return [
       ...historical.map(d => ({ ...d, type: 'historical' as const })),
       ...forecastWithBridge

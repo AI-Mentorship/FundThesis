@@ -60,6 +60,9 @@ export default function DashboardPage() {
         <PortfolioOverview />
       </div>
 
+      {/* User Tickers Section */}
+      <UserTickersSection className="mb-6" />
+
       {/* News & Performers */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <NewsSection 
@@ -81,9 +84,6 @@ export default function DashboardPage() {
 
       {/* Technical Models */}
       <TechnicalModelsSection className="mb-6" />
-
-      {/* User Tickers Section */}
-      <UserTickersSection />
     </main>
   )
 }
