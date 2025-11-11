@@ -7,6 +7,7 @@ import { NewsSection } from '@/components/dashboard/NewsSection'
 import { PerformersSection } from '@/components/dashboard/PerformersSection'
 import { IndexesSection } from '@/components/dashboard/IndexesSection'
 import { TechnicalModelsSection } from '@/components/dashboard/TechnicalModelsSection'
+import { UserTickersSection } from '@/components/dashboard/UserTickersSection'
 
 export default function DashboardPage() {
   const newsItems = [
@@ -97,6 +98,9 @@ export default function DashboardPage() {
 
       {/* Technical Models */}
       <TechnicalModelsSection className="mb-6" />
+
+      {/* User Tickers Section */}
+      <UserTickersSection />
     </main>
   )
 }
