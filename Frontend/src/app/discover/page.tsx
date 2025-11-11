@@ -163,8 +163,21 @@ function DiscoverPage() {
     
     // Get the last historical data point
     const lastHistorical = historical[historical.length - 1]
+    const lastHistoricalDate = new Date(lastHistorical.date)
     
-    // Ensure forecast starts from the last historical point
+    // Filter forecast to only include dates AFTER the last historical date
+    // This ensures forecast only appears after available stock price ends
+    const futureForecast = forecast.filter(f => {
+      const forecastDate = new Date(f.date)
+      return forecastDate > lastHistoricalDate
+    })
+    
+    if (futureForecast.length === 0) {
+      // No future forecast data, just return historical
+      return historical.map(d => ({ ...d, type: 'historical' as const }))
+    }
+    
+    // Ensure forecast starts from the last historical point (bridge)
     // This creates a seamless connection between historical and forecast
     const forecastWithBridge = [
       // Bridge point: last historical point (connects the two lines)
@@ -173,14 +186,14 @@ function DiscoverPage() {
         price: lastHistorical.price,
         type: 'forecast' as const
       },
-      // Rest of forecast points
-      ...forecast.map(f => ({
+      // Only future forecast points (after last historical date)
+      ...futureForecast.map(f => ({
         ...f,
         type: 'forecast' as const
       }))
     ]
     
-    // Combine: historical + forecast (with bridge)
+    // Combine: historical + forecast (with bridge, only future dates)
     return [
       ...historical.map(d => ({ ...d, type: 'historical' as const })),
       ...forecastWithBridge
