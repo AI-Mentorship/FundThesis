@@ -336,7 +336,7 @@ export function StockCardStack({
                             tickFormatter={(value) => `${value}`}
                           />
                           <Tooltip content={<CustomTooltip />} />
-                          {/* Historical line - solid */}
+                          {/* Historical line - solid, only shows historical data points */}
                           <Line
                             type="monotone"
                             dataKey="price"
@@ -344,10 +344,10 @@ export function StockCardStack({
                             strokeWidth={3}
                             dot={false}
                             connectNulls={true}
-                            data={combinedChartData.filter((d) => d.type !== "forecast")}
+                            data={combinedChartData.filter((d) => d.type === "historical")}
                             name="Historical"
                           />
-                          {/* Forecast line - dashed and more visible */}
+                          {/* Forecast line - dashed, extends from last historical point */}
                           {combinedChartData.some(
                             (d) => d.type === "forecast"
                           ) && (

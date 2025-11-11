@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { StockCardStack } from '@/components/StockCard'
 
 interface Stock {
@@ -146,6 +146,47 @@ function DiscoverPage() {
     }
   }
 
+  // Calculate current symbol and stock detail (before conditional return)
+  const currentSymbol = stocks[currentIndex]?.symbol
+  const stockDetail = currentSymbol ? stockDetails[currentSymbol] : undefined
+  
+  // Combine chart data, ensuring forecast extends from historical
+  // This must be called before any conditional returns to follow Rules of Hooks
+  const combinedChartData = useMemo(() => {
+    if (!stockDetail) return []
+    
+    const historical = stockDetail.chartData ?? []
+    const forecast = stockDetail.forecastData ?? []
+    
+    if (historical.length === 0) return forecast.map(d => ({ ...d, type: 'forecast' as const }))
+    if (forecast.length === 0) return historical.map(d => ({ ...d, type: 'historical' as const }))
+    
+    // Get the last historical data point
+    const lastHistorical = historical[historical.length - 1]
+    
+    // Ensure forecast starts from the last historical point
+    // This creates a seamless connection between historical and forecast
+    const forecastWithBridge = [
+      // Bridge point: last historical point (connects the two lines)
+      {
+        date: lastHistorical.date,
+        price: lastHistorical.price,
+        type: 'forecast' as const
+      },
+      // Rest of forecast points
+      ...forecast.map(f => ({
+        ...f,
+        type: 'forecast' as const
+      }))
+    ]
+    
+    // Combine: historical + forecast (with bridge)
+    return [
+      ...historical.map(d => ({ ...d, type: 'historical' as const })),
+      ...forecastWithBridge
+    ]
+  }, [stockDetail])
+
   if (loading) {
     return (
       <main className="max-w-7xl mx-auto px-4 py-2">
@@ -155,13 +196,6 @@ function DiscoverPage() {
       </main>
     )
   }
-
-  const currentSymbol = stocks[currentIndex]?.symbol
-  const stockDetail = currentSymbol ? stockDetails[currentSymbol] : undefined
-  const combinedChartData = [
-    ...(stockDetail?.chartData ?? []),
-    ...(stockDetail?.forecastData ?? [])
-  ]
 
   console.log('🎯 Rendering with:', {
     currentSymbol,
