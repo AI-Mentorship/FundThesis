@@ -1,8 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Navbar from '../../components/Navbar';
-import StockTicker from '../../components/StockTicker';
 import { getProgress } from '../lessonmodules/data/userProgress';
 import ProgressRing from '../lessonmodules/components/ProgressRing';
 
@@ -74,11 +72,6 @@ const LearnPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
-      {/* real stock ticker component */}
-      <StockTicker />
-
       <main className="max-w-6xl mx-auto p-6">
         <section className="bg-white rounded-lg shadow p-8 mb-8">
           <h1 className="text-3xl font-bold mb-2">Placeholder hero title</h1>
