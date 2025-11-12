@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { StockCardStack } from "@/components/StockCard";
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { StockCardStack } from '@/components/StockCard'
 
 interface Stock {
   symbol: string;
@@ -172,6 +172,67 @@ function DiscoverPage() {
     }
   };
 
+  // Calculate current symbol and stock detail (before conditional return)
+  const currentSymbol = stocks[currentIndex]?.symbol
+  const stockDetail = currentSymbol ? stockDetails[currentSymbol] : undefined
+  
+  // Combine chart data, ensuring forecast extends from historical
+  // This must be called before any conditional returns to follow Rules of Hooks
+  const combinedChartData = useMemo(() => {
+    if (!stockDetail) return []
+    
+    const historical = stockDetail.chartData ?? []
+    const forecast = stockDetail.forecastData ?? []
+    
+    if (historical.length === 0) return forecast.map(d => ({ ...d, type: 'forecast' as const }))
+    if (forecast.length === 0) return historical.map(d => ({ ...d, type: 'historical' as const }))
+    
+    // Create a set of historical dates for quick lookup
+    const historicalDates = new Set(historical.map(h => h.date))
+    
+    // Get the last historical data point
+    const lastHistorical = historical[historical.length - 1]
+    const lastHistoricalDate = new Date(lastHistorical.date)
+    
+    // Filter forecast to only include:
+    // 1. Dates AFTER the last historical date
+    // 2. Dates that don't exist in historical data (no overlap)
+    const futureForecast = forecast.filter(f => {
+      const forecastDate = new Date(f.date)
+      const forecastDateStr = f.date
+      
+      // Must be after last historical date AND not exist in historical data
+      return forecastDate > lastHistoricalDate && !historicalDates.has(forecastDateStr)
+    })
+    
+    if (futureForecast.length === 0) {
+      // No future forecast data, just return historical
+      return historical.map(d => ({ ...d, type: 'historical' as const }))
+    }
+    
+    // Ensure forecast starts from the last historical point (bridge)
+    // This creates a seamless connection between historical and forecast
+    const forecastWithBridge = [
+      // Bridge point: last historical point (connects the two lines)
+      {
+        date: lastHistorical.date,
+        price: lastHistorical.price,
+        type: 'forecast' as const
+      },
+      // Only future forecast points (after last historical date and not overlapping)
+      ...futureForecast.map(f => ({
+        ...f,
+        type: 'forecast' as const
+      }))
+    ]
+    
+    // Combine: historical + forecast (with bridge, only future dates with no overlap)
+    return [
+      ...historical.map(d => ({ ...d, type: 'historical' as const })),
+      ...forecastWithBridge
+    ]
+  }, [stockDetail])
+
   if (loading) {
     return (
       <main className="max-w-7xl mx-auto px-4 py-2">
@@ -188,14 +249,7 @@ function DiscoverPage() {
     );
   }
 
-  const currentSymbol = stocks[currentIndex]?.symbol;
-  const stockDetail = currentSymbol ? stockDetails[currentSymbol] : undefined;
-  const combinedChartData = [
-    ...(stockDetail?.chartData ?? []),
-    ...(stockDetail?.forecastData ?? []),
-  ];
-
-  console.log("🎯 Rendering with:", {
+  console.log('🎯 Rendering with:', {
     currentSymbol,
     hasDetail: !!stockDetail,
     combinedPoints: combinedChartData.length,

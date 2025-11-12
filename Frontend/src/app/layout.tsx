@@ -2,10 +2,13 @@
 
 import "./globals.css"
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import StockTicker from '@/components/StockTicker'
 import Footer from '@/components/Footer'
 import { Merriweather } from 'next/font/google'
+import { supabase, getCurrentUser } from '@/lib/supabaseClient'
+import type { User } from '@supabase/supabase-js'
 
 const merriweather = Merriweather({ 
   weight: ['300', '400', '700', '900'],
@@ -19,6 +22,28 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const currentUser = await getCurrentUser()
+        setUser(currentUser)
+      } catch (error) {
+        setUser(null)
+      }
+    }
+
+    loadUser()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   const navItems = [
     { name: 'Dashboard', href: '/dashboard' },
@@ -60,8 +85,8 @@ export default function RootLayout({
                 ))}
               </div>
 
-              {/* Profile */}
-              <div className="flex items-center">
+              {/* Profile & Logout */}
+              <div className="flex items-center gap-4">
                 <Link
                   href="/profile"
                   className={`text-sm font-medium transition-colors hover:text-gray-600 ${
@@ -72,6 +97,18 @@ export default function RootLayout({
                 >
                   Profile
                 </Link>
+                {user && (
+                  <button
+                    onClick={async () => {
+                      await supabase.auth.signOut()
+                      router.push('/auth')
+                      router.refresh()
+                    }}
+                    className="text-sm font-medium text-gray-500 hover:text-red-600 transition-colors"
+                  >
+                    Logout
+                  </button>
+                )}
               </div>
 
               {/* Mobile Menu Button */}

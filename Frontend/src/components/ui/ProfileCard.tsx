@@ -54,9 +54,10 @@ export function AccountInfoCard({ profile, className = "" }: AccountInfoCardProp
 
 interface PreferencesCardProps {
   className?: string
+  onLogout?: () => void
 }
 
-export function PreferencesCard({ className = "" }: PreferencesCardProps) {
+export function PreferencesCard({ className = "", onLogout }: PreferencesCardProps) {
   return (
     <div className={`bg-white p-6 rounded-lg shadow-sm border border-gray-200 ${className}`}>
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Preferences</h3>
@@ -73,6 +74,16 @@ export function PreferencesCard({ className = "" }: PreferencesCardProps) {
             Disabled
           </button>
         </div>
+        {onLogout && (
+          <div className="pt-4 border-t border-gray-200">
+            <button
+              onClick={onLogout}
+              className="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            >
+              Logout
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

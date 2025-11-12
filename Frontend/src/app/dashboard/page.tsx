@@ -1,12 +1,11 @@
 import React from 'react'
-import { TrendingUp, TrendingDown } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { Card, CardContent } from '@/components/ui/Card'
 import { PortfolioOverview } from '@/components/dashboard/PortfolioOverview'
 import { NewsSection } from '@/components/dashboard/NewsSection'
 import { PerformersSection } from '@/components/dashboard/PerformersSection'
 import { IndexesSection } from '@/components/dashboard/IndexesSection'
 import { TechnicalModelsSection } from '@/components/dashboard/TechnicalModelsSection'
+import { UserTickersSection } from '@/components/dashboard/UserTickersSection'
 
 export default function DashboardPage() {
   const newsItems = [
@@ -41,11 +40,6 @@ export default function DashboardPage() {
     { rank: 5, symbol: "JPM", name: "JPMorgan Chase", price: "$210.80", change: "+1.20", percent: "+0.57%" }
   ]
 
-  const portfolioStats = [
-    { label: "Daily Gain", value: "+2.5%", description: "Change since last market close", positive: true, icon: TrendingUp },
-    { label: "Weekly Gain", value: "-1.2%", description: "Performance over past 7 days", positive: false, icon: TrendingDown },
-    { label: "Monthly Gain", value: "+8.7%", description: "Performance over past 30 days", positive: true, icon: TrendingUp }
-  ]
 
   const indexes = [
     { color: "bg-blue-500", name: "HealthThesis", description: "Overall stock market health indicator" },
@@ -63,18 +57,11 @@ export default function DashboardPage() {
 
       {/* Portfolio Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <Card className="rounded-2xl">
-          <CardContent>
-            <h2 className="text-xl font-bold mb-3">Portfolio Value</h2>
-            <div className="h-64 bg-gray-50 rounded-lg"></div>
-          </CardContent>
-        </Card>
-
-        <PortfolioOverview 
-          totalValue="$125,000"
-          stats={portfolioStats}
-        />
+        <PortfolioOverview />
       </div>
+
+      {/* User Tickers Section */}
+      <UserTickersSection className="mb-6" />
 
       {/* News & Performers */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">

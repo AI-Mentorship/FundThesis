@@ -1,4 +1,8 @@
 "use client";
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { getProgress } from '../lessonmodules/data/userProgress';
+import ProgressRing from '../lessonmodules/components/ProgressRing';
 import React from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";

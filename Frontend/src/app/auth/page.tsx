@@ -17,21 +17,41 @@ export default function AuthPage() {
   const handleLogin = async () => {
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
 
-    if (error) setError(error.message);
-    else router.push("/dashboard"); // redirect after login
+    if (error) {
+      setError(error.message);
+    } else {
+      // Verify session was created
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.push("/dashboard");
+        router.refresh(); // Refresh to update middleware
+      } else {
+        setError("Login successful but session not found. Please try again.");
+      }
+    }
   };
 
   const handleSignup = async () => {
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     setLoading(false);
 
-    if (error) setError(error.message);
-    else alert("Signup successful! Please check your email for confirmation.");
+    if (error) {
+      setError(error.message);
+    } else {
+      // Check if email confirmation is required
+      if (data.user && !data.session) {
+        alert("Signup successful! Please check your email for confirmation.");
+      } else if (data.session) {
+        // Auto-login if email confirmation is disabled
+        router.push("/dashboard");
+        router.refresh();
+      }
+    }
   };
 
   return (
