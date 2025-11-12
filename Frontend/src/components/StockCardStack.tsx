@@ -129,18 +129,29 @@ export function StockCardStack({
         </button>
 
         <div className="relative w-full min-h-[950px] flex items-center justify-center py-8">
-          {stocks.map((stock, index) => (
-            <div key={`${stock.symbol}-${index}`} className="absolute w-full max-w-[650px] min-h-[900px] transition-all duration-500 ease-out cursor-pointer" style={getCardStyle(index)}>
-              <StockCard
-                stock={stock}
-                detail={stockDetails[stock.symbol]}
-                isActive={index === currentIndex}
-                timeframe={timeframe}
-                setTimeframe={setTimeframe}
-                onClick={() => handleCardClick(stock, index)}
-              />
-            </div>
-          ))}
+          {stocks.map((stock, index) => {
+            const detail = stockDetails[stock.symbol];
+            const chartData = detail
+              ? [
+                  ...(detail.chartData?.map((d) => ({ ...d, type: "historical" as const })) || []),
+                  ...(detail.forecastData?.map((d) => ({ ...d, type: "forecast" as const })) || []),
+                ]
+              : [];
+            
+            return (
+              <div key={`${stock.symbol}-${index}`} className="absolute w-full max-w-[650px] min-h-[900px] transition-all duration-500 ease-out cursor-pointer" style={getCardStyle(index)}>
+                <StockCard
+                  stock={stock}
+                  detail={detail}
+                  isActive={index === currentIndex}
+                  timeframe={timeframe}
+                  setTimeframe={setTimeframe}
+                  onClick={() => handleCardClick(stock, index)}
+                  chartData={chartData}
+                />
+              </div>
+            );
+          })}
         </div>
 
         <button onClick={goToNext} className="absolute right-0 z-40 p-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-300 group">

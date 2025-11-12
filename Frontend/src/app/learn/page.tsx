@@ -1,14 +1,28 @@
+"use client";
 import React from "react";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import StockTicker from "@/components/StockTicker";
+import ProgressRing from "@/app/lessonmodules/components/ProgressRing";
+import { getProgress } from "@/app/lessonmodules/data/userProgress";
+
+const moduleTitles = [
+  "Introduction to FundThesis",
+  "What is a Stock and ETF",
+  "Buying vs Selling",
+  "Portfolio Basics",
+  "Market Movement & Risk",
+  "Company Research Basics",
+  "Long-Term vs Short-Term Thinking",
+  "Reading a graph",
+  "Sustainability Factors",
+  "Demo",
+];
 
 export default function LearnPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
       {/* real stock ticker component */}
-      <StockTicker />
 
       <main className="max-w-6xl mx-auto p-6">
         <section className="bg-white rounded-lg shadow p-8 mb-8">
@@ -33,7 +47,7 @@ export default function LearnPage() {
                   <Link
                     key={i}
                     href={`/lessonmodules/${moduleNumber}`}
-                    className="block p-6 hover:bg-gray-50 flex items-center justify-between"
+                    className="flex p-6 hover:bg-gray-50 items-center justify-between"
                   >
                     <div>
                       <div className="text-sm text-gray-500">
@@ -72,7 +86,7 @@ export default function LearnPage() {
                       </div>
                       <div className="w-12 h-12">
                         <ProgressRing
-                          percent={progress[i] ?? getProgress(moduleNumber, 4)}
+                          percent={getProgress(moduleNumber, 4)}
                           size={44}
                         />
                       </div>
