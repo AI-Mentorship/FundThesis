@@ -102,7 +102,11 @@ export default function EnviroPage() {
       description: "Corporate ethics, board structure, executive compensation, transparency, and accountability.",
       color: "text-purple-600"
     }
-  ]
+
+    setShowDeleteConfirm(false)
+    setSelectedToDelete(null)
+    setDeleteConfirmText('')
+  }
 
   const formatNumber = (num: number | undefined, decimals = 2) => {
     return num != null ? num.toFixed(decimals) : "-"
@@ -139,6 +143,7 @@ export default function EnviroPage() {
               />
             ))}
           </div>
+        </section>
 
           <Card className="rounded-2xl">
             <CardContent className="p-6">
@@ -229,6 +234,31 @@ export default function EnviroPage() {
           </Card>
         </div>
       </main>
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black opacity-40" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); setSelectedToDelete(null) }} />
+          <div className="relative bg-white rounded-lg p-6 w-full max-w-md z-10">
+            <h3 className="text-lg font-semibold mb-2">Confirm delete</h3>
+            <p className="text-sm text-gray-600 mb-4">To permanently delete the sandbox <span className="font-medium">{selectedToDelete?.name}</span>, type <span className="font-mono">delete</span> below and press Confirm.</p>
+            <input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type delete to confirm"
+              className="w-full border rounded px-3 py-2 mb-4"
+            />
+            <div className="flex justify-end gap-3">
+              <button onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); setSelectedToDelete(null) }} className="px-3 py-2 rounded border">Cancel</button>
+              <button
+                onClick={() => { if (deleteConfirmText.trim().toLowerCase() === 'delete') { confirmDeleteSandbox() } }}
+                disabled={deleteConfirmText.trim().toLowerCase() !== 'delete'}
+                className={`px-3 py-2 rounded text-white ${deleteConfirmText.trim().toLowerCase() === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-red-300 cursor-not-allowed'}`}
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

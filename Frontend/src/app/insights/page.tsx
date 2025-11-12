@@ -165,6 +165,7 @@ export default function InsightsPage() {
           </CardContent>
         </Card>
       </main>
+    
     </div>
   )
 }
