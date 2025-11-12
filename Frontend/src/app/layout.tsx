@@ -31,7 +31,7 @@ export default function RootLayout({
 
   return (
     <html lang="en" className={merriweather.className}>
-      <body>
+      <body suppressHydrationWarning={true}>
         <div className="min-h-screen bg-gray-50 flex flex-col">
           {/* Navbar */}
           <nav className="border-b border-gray-200 px-4 py-5">

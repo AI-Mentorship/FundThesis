@@ -172,6 +172,11 @@ function DiscoverPage() {
     }
   };
 
+  const clearSearch = () => {
+    setSearchQuery('')
+    setCurrentIndex(0)
+  }
+
   if (loading) {
     return (
       <main className="max-w-7xl mx-auto px-4 py-2">
@@ -222,6 +227,35 @@ function DiscoverPage() {
           checkAndLoadMore={checkAndLoadMore}
         />
       </div>
+
+      {/* Stock Cards */}
+      {filteredStocks.length > 0 ? (
+        <div className="py-2">
+          <StockCardStack 
+            stocks={filteredStocks}
+            stockDetails={stockDetails}
+            combinedChartData={combinedChartData} 
+            currentIndex={currentIndex}
+            setCurrentIndex={setCurrentIndex}
+            timeframe={timeframe}
+            setTimeframe={setTimeframe}
+            loadingMore={loadingMore}
+            checkAndLoadMore={checkAndLoadMore}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-20 text-gray-600">
+          <Search className="w-16 h-16 text-gray-300 mb-4" />
+          <p className="text-xl font-medium">No stocks found</p>
+          <p className="text-sm mt-2">Try searching for a different symbol or company name</p>
+          <button
+            onClick={clearSearch}
+            className="mt-4 px-6 py-2 bg-[#9DB38A] text-white rounded-lg hover:bg-[#8ca279] transition-colors"
+          >
+            Clear Search
+          </button>
+        </div>
+      )}
     </main>
   );
 }
