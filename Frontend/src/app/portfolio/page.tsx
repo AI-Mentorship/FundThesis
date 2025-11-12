@@ -33,6 +33,7 @@ export default function PortfolioPage() {
         
         <PortfolioTable holdings={holdings} />
       </main>
+      
     </div>
   )
 }
