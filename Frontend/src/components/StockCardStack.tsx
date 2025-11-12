@@ -24,11 +24,14 @@ interface StockDetail {
   low: number
   volume: number
   avgVolume: number
-  fiftyTwoWeekHigh: number
-  fiftyTwoWeekLow: number
-  peRatio: number
+  fiftyTwoWeekHigh?: number
+  fiftyTwoWeekLow?: number
+  peRatio?: number
   sector: string
+  industry: string
+  marketCap: number
   chartData: Array<{ date: string; price: number }>
+  forecastData?: Array<{ date: string; price: number }>
 }
 
 interface StockCardStackProps {

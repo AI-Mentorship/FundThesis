@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Search, X } from "lucide-react";
 import { PortfolioChart, PortfolioHistoryPoint } from "@/components/enviro-compoents-real/Portfolio";
@@ -10,6 +10,27 @@ import MarketTips from "@/components/enviro-compoents-real/market-tips";
 import { StockCardStack } from '@/components/StockCardStack';
 import StockTradeModal from '@/components/StockTradeModal';
 import { TransactionHistory, Transaction} from "@/components/enviro-compoents-real/sandbox-transaction";
+
+interface StockDetail {
+  symbol: string
+  company: string
+  price: number
+  change: number
+  changePercent: number
+  open: number
+  high: number
+  low: number
+  volume: number
+  avgVolume: number
+  fiftyTwoWeekHigh?: number
+  fiftyTwoWeekLow?: number
+  peRatio?: number
+  sector: string
+  industry: string
+  marketCap: number
+  chartData: Array<{ date: string; price: number }>
+  forecastData?: Array<{ date: string; price: number }>
+}
 
 // Sample stock data - ALL available stocks
 const allStocks = [
@@ -58,13 +79,13 @@ const mockData: PortfolioHistoryPoint[] = [
 
 
 
-export default function PortfolioDashboardPage() {
+function PortfolioDashboardPageContent() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredStocks, setFilteredStocks] = useState(allStocks);
   
   const [stocks, setStocks] = useState(allStocks);
-  const [stockDetails, setStockDetails] = useState<any>({});
+  const [stockDetails, setStockDetails] = useState<{ [key: string]: StockDetail }>({});
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeframe, setTimeframe] = useState<'day' | 'month' | 'year' | 'all'>('day');
   const [loadingMore, setLoadingMore] = useState(false);
@@ -180,7 +201,7 @@ export default function PortfolioDashboardPage() {
   }, [searchParams])
 
   // Function to generate mock chart data
-  const generateChartData = (symbol: string, timeframe: 'day' | 'month' | 'year') => {
+  const generateChartData = (symbol: string, timeframe: 'day' | 'month' | 'year' | 'all') => {
     const stock = stocks.find(s => s.symbol === symbol);
     if (!stock) return [];
     
@@ -218,7 +239,7 @@ export default function PortfolioDashboardPage() {
     // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    setStockDetails((prev: any) => ({
+    setStockDetails((prev: { [key: string]: StockDetail }) => ({
       ...prev,
       [symbol]: {
         ...stock,
@@ -229,8 +250,10 @@ export default function PortfolioDashboardPage() {
         avgVolume: Math.floor(Math.random() * 40000000),
         fiftyTwoWeekHigh: stock.price + Math.random() * 50,
         fiftyTwoWeekLow: stock.price - Math.random() * 50,
-        peRatio: (Math.random() * 50 + 10).toFixed(2),
+        peRatio: parseFloat((Math.random() * 50 + 10).toFixed(2)),
         sector: ['Technology', 'Consumer', 'Energy', 'Finance'][Math.floor(Math.random() * 4)],
+        industry: ['Software', 'Hardware', 'E-commerce', 'Banking'][Math.floor(Math.random() * 4)],
+        marketCap: Math.floor(Math.random() * 1000000000000) + 10000000000,
         chartData: generateChartData(symbol, timeframe)
       }
     }));
@@ -303,7 +326,7 @@ export default function PortfolioDashboardPage() {
   const holdingsValue = Object.keys(holdingsMap).reduce((acc, sym) => {
     const qty = holdingsMap[sym] || 0
     const detail = stockDetails[sym] || allStocks.find(s => s.symbol === sym)
-    const price = detail ? (detail as any).price : 0
+    const price = detail ? (detail as StockDetail | typeof allStocks[0]).price : 0
     return acc + qty * price
   }, 0)
 
@@ -314,7 +337,14 @@ export default function PortfolioDashboardPage() {
   const totalGainLoss = totalValue - baseline
   const totalGainLossPercent = baseline ? (totalGainLoss / baseline) * 100 : 0
 
-  const ExpandedModalWrapper = (props: any) => {
+  const ExpandedModalWrapper = (props: {
+    stock: StockDetail
+    onClose: () => void
+    timeframe: 'day' | 'month' | 'year' | 'all'
+    setTimeframe: (timeframe: 'day' | 'month' | 'year' | 'all') => void
+    fetchStockDetail: (symbol: string) => Promise<void>
+    stockDetails: { [key: string]: StockDetail }
+  }) => {
     const symbol = props.stock?.symbol
     const holdings = symbol ? (holdingsMap[symbol] || 0) : 0
     return (
@@ -454,5 +484,13 @@ export default function PortfolioDashboardPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function PortfolioDashboardPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PortfolioDashboardPageContent />
+    </Suspense>
   );
 }

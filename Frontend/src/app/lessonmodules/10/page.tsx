@@ -193,7 +193,7 @@ const Module10: React.FC = () => {
 
             <div className="w-full bg-gray-50 p-4 rounded mb-4 text-black">
               <label className="block text-sm font-semibold mb-1 text-black">Order Type</label>
-              <select value={orderType} onChange={(e) => setOrderType(e.target.value as any)} className="w-full mb-3 p-2 border rounded">
+              <select value={orderType} onChange={(e) => setOrderType(e.target.value as 'market' | 'limit' | 'stop')} className="w-full mb-3 p-2 border rounded">
                 <option value="market">Market</option>
                 <option value="limit">Limit</option>
                 <option value="stop">Stop</option>

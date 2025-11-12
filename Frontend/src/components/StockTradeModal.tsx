@@ -15,9 +15,9 @@ interface StockDetail {
   low: number
   volume: number
   avgVolume: number
-  fiftyTwoWeekHigh: number
-  fiftyTwoWeekLow: number
-  peRatio: number
+  fiftyTwoWeekHigh?: number
+  fiftyTwoWeekLow?: number
+  peRatio?: number
   sector: string
   chartData: Array<{ date: string; price: number }>
 }
@@ -97,7 +97,7 @@ export default function StockTradeModal({ stock, onClose, timeframe, setTimefram
                   <LineChart data={stock.chartData}>
                     <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={(value) => { const date = new Date(value); return `${date.getMonth() + 1}/${date.getDate()}` }} />
                     <YAxis domain={["auto", "auto"]} tick={{ fontSize: 12 }} tickFormatter={(value) => `$${value}`} />
-                    <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc', borderRadius: '8px', fontSize: '14px', padding: '10px' }} formatter={(value: any) => [`$${value}`, 'Price']} labelFormatter={(label) => `Date: ${label}`} />
+                    <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc', borderRadius: '8px', fontSize: '14px', padding: '10px' }} formatter={(value: number | string) => [`$${value}`, 'Price']} labelFormatter={(label) => `Date: ${label}`} />
                     <Line type="monotone" dataKey="price" stroke={stock.change >= 0 ? '#9DB38A' : '#c17b7b'} strokeWidth={3} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>

@@ -68,7 +68,7 @@ export function PortfolioChart({ portfolioHistory }: PortfolioChartProps) {
   const totalChangePercent = initialValue !== 0 ? (totalChange / initialValue) * 100 : 0;
   const isPositive = totalChange >= 0;
 
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { timestamp: Date; value: number } }> }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (

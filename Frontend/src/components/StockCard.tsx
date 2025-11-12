@@ -1030,7 +1030,7 @@ export function StockCardStack({
                 {/* Price Metrics */}
                 <div className="bg-gradient-to-br from-[#eff3eb] to-white rounded-xl p-6 border-2 border-[#9DB38A]">
                   <p className="text-sm font-semibold text-gray-500 uppercase mb-3">
-                    Today's Range
+                    Today&apos;s Range
                   </p>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
