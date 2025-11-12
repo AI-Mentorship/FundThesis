@@ -1,38 +1,54 @@
-import React from 'react'
+import React from "react";
+import { PageHeader } from "@/components/ui/PageHeader";
+import {
+  Card,
+  CardContent,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/Card";
 
 export default function HomePage() {
+  const features = [
+    {
+      title: "Real-time Analysis",
+      description:
+        "Get instant insights on market trends and stock performance.",
+    },
+    {
+      title: "Portfolio Optimization",
+      description: "AI-driven recommendations for portfolio diversification.",
+    },
+    {
+      title: "Educational Resources",
+      description:
+        "Learn investing fundamentals with our comprehensive guides.",
+    },
+  ];
+
   return (
     <main className="max-w-7xl mx-auto px-4 py-8">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Welcome to Fundthesis
-        </h1>
-        <p className="text-xl text-gray-600 mb-8">
-          AI-Powered Financial Education Platform
-        </p>
+        <PageHeader
+          title="Welcome to Fundthesis"
+          description="AI-Powered Financial Education Platform"
+        />
         <p className="text-lg text-gray-500 max-w-3xl mx-auto">
-          Empowering first-time and seasoned retail investors with real-time news 
-          summarization and AI-powered stock analysis for portfolio diversification.
+          Empowering first-time and seasoned retail investors with real-time
+          news summarization and AI-powered stock analysis for portfolio
+          diversification.
         </p>
       </div>
-      
-      {/* Placeholder for future content */}
+
       <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Real-time Analysis</h3>
-          <p className="text-gray-600">Get instant insights on market trends and stock performance.</p>
-        </div>
-        
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Portfolio Optimization</h3>
-          <p className="text-gray-600">AI-driven recommendations for portfolio diversification.</p>
-        </div>
-        
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Educational Resources</h3>
-          <p className="text-gray-600">Learn investing fundamentals with our comprehensive guides.</p>
-        </div>
+        {features.map((feature, index) => (
+          <Card key={index}>
+            <CardContent>
+              <CardTitle className="mb-2">{feature.title}</CardTitle>
+              <CardDescription>{feature.description}</CardDescription>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </main>
-  )
+  );
 }

@@ -2,6 +2,10 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import yfinance as yf
 import os
+import json
+from save_forecasting_to_db import get_next_30_day_predictions
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import traceback
 
 app = Flask(__name__)
 
@@ -10,6 +14,9 @@ if os.getenv('FLASK_ENV') == 'production':
     CORS(app, resources={r"/api/*": {"origins": os.getenv('FRONTEND_URL', '*')}})
 else:
     CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+# Thread pool for async tasks
+executor = ThreadPoolExecutor(max_workers=4)
 
 @app.route('/api/stocks', methods=['GET'])
 def get_stocks():
@@ -72,11 +79,25 @@ def get_stocks():
         'hasMore': (offset + limit) < len(symbols)
     })
 
+def get_forecast_with_timeout(symbol, timeout=None):
+    """Run forecast without timeout"""
+    try:
+        print(f"🔮 Running forecast for {symbol} (no timeout)...")
+        # Pass symbol string, not ticker object
+        result = get_next_30_day_predictions(symbol)
+        return result
+    except Exception as e:
+        print(f"❌ Forecast error: {e}")
+        traceback.print_exc()
+        return None, None, None
+
 @app.route('/api/stock/<symbol>', methods=['GET'])
 def get_stock_detail(symbol):
     try:
         # Get timeframe from query params (default to 1 month)
         days = request.args.get('days', default=30, type=int)
+        
+        print(f"📊 Fetching stock detail for {symbol}...")
         
         ticker = yf.Ticker(symbol)
         info = ticker.info
@@ -103,43 +124,96 @@ def get_stock_detail(symbol):
         # Get current day data
         today_history = ticker.history(period='1d')
         
-        if not today_history.empty:
-            current_price = today_history['Close'].iloc[-1]
-            open_price = today_history['Open'].iloc[0]
-            change = current_price - open_price
-            change_percent = (change / open_price) * 100
-            
-            # Format historical data for chart
-            chart_data = []
-            for index, row in history.iterrows():
-                chart_data.append({
-                    'date': index.strftime('%Y-%m-%d'),
-                    'price': round(float(row['Close']), 2),
-                    'volume': int(row['Volume'])
-                })
-            
-            return jsonify({
-                'symbol': symbol,
-                'company': info.get('longName', symbol),
-                'price': round(current_price, 2),
-                'change': round(change, 2),
-                'changePercent': round(change_percent, 2),
-                'open': round(float(today_history['Open'].iloc[0]), 2) if not today_history.empty else 0,
-                'high': round(float(today_history['High'].max()), 2) if not today_history.empty else 0,
-                'low': round(float(today_history['Low'].min()), 2) if not today_history.empty else 0,
-                'volume': int(today_history['Volume'].iloc[-1]) if not today_history.empty else 0,
-                'avgVolume': int(info.get('averageVolume', 0)),
-                'fiftyTwoWeekHigh': round(float(info.get('fiftyTwoWeekHigh', 0)), 2),
-                'fiftyTwoWeekLow': round(float(info.get('fiftyTwoWeekLow', 0)), 2),
-                'marketCap': info.get('marketCap', 0),
-                'peRatio': round(float(info.get('trailingPE', 0)), 2) if info.get('trailingPE') else 0,
-                'dividendYield': info.get('dividendYield', 0),
-                'sector': info.get('sector', 'N/A'),
-                'industry': info.get('industry', 'N/A'),
-                'chartData': chart_data
+        if today_history.empty:
+            return jsonify({'error': 'No data available for this symbol'}), 404
+        
+        current_price = today_history['Close'].iloc[-1]
+        open_price = today_history['Open'].iloc[0]
+        change = current_price - open_price
+        change_percent = (change / open_price) * 100
+        
+        # Format historical data for chart
+        chart_data = []
+        for index, row in history.iterrows():
+            chart_data.append({
+                'date': index.strftime('%Y-%m-%d'),
+                'price': round(float(row['Close']), 2),
+                'volume': int(row['Volume'])
             })
+        
+        print(f"✅ Historical data: {len(chart_data)} points")
+        
+        # Get forecast data (no timeout - let it take as long as needed)
+        print(f"🔮 Starting forecast for {symbol}... (this may take a while)")
+        forecast_data = []
+        
+        # Pass the symbol string, not the ticker object
+        predict_df, mse, r2 = get_forecast_with_timeout(symbol)
+        
+        if predict_df is not None and not predict_df.empty:
+            print(f"✅ Forecast successful: {len(predict_df)} points")
+            print(f"📋 Forecast columns: {predict_df.columns.tolist()}")
+            print(f"📊 Sample forecast data:\n{predict_df.head()}")
+            
+            # Convert pandas DataFrame to list of dictionaries
+            try:
+                forecast_data = json.loads(predict_df.to_json(orient='records', date_format='iso'))
+                
+                # Format each forecast point - handle your actual column names
+                formatted_forecast = []
+                for item in forecast_data:
+                    # Your function returns 'Date' and 'Predicted_Close'
+                    date_val = item.get('Date', item.get('date', ''))
+                    price_val = item.get('Predicted_Close', item.get('predicted_price', item.get('price', 0)))
+                    
+                    # Convert timestamp to date string if needed
+                    if isinstance(date_val, (int, float)):
+                        from datetime import datetime
+                        date_val = datetime.fromtimestamp(date_val / 1000).strftime('%Y-%m-%d')
+                    
+                    formatted_forecast.append({
+                        'date': date_val,
+                        'price': round(float(price_val), 2)
+                    })
+                
+                forecast_data = formatted_forecast
+                print(f"📈 Forecast formatted: {len(forecast_data)} points")
+                print(f"📊 Sample formatted data: {forecast_data[:2]}")
+            except Exception as e:
+                print(f"⚠️ Error formatting forecast: {e}")
+                traceback.print_exc()
+                forecast_data = []
+        else:
+            print(f"⚠️ No forecast available for {symbol}")
+        
+        response_data = {
+            'symbol': symbol,
+            'company': info.get('longName', symbol),
+            'price': round(current_price, 2),
+            'change': round(change, 2),
+            'changePercent': round(change_percent, 2),
+            'open': round(float(today_history['Open'].iloc[0]), 2) if not today_history.empty else 0,
+            'high': round(float(today_history['High'].max()), 2) if not today_history.empty else 0,
+            'low': round(float(today_history['Low'].min()), 2) if not today_history.empty else 0,
+            'volume': int(today_history['Volume'].iloc[-1]) if not today_history.empty else 0,
+            'avgVolume': int(info.get('averageVolume', 0)),
+            'fiftyTwoWeekHigh': round(float(info.get('fiftyTwoWeekHigh', 0)), 2),
+            'fiftyTwoWeekLow': round(float(info.get('fiftyTwoWeekLow', 0)), 2),
+            'marketCap': info.get('marketCap', 0),
+            'peRatio': round(float(info.get('trailingPE', 0)), 2) if info.get('trailingPE') else 0,
+            'dividendYield': info.get('dividendYield', 0),
+            'sector': info.get('sector', 'N/A'),
+            'industry': info.get('industry', 'N/A'),
+            'chartData': chart_data,
+            'forecastData': forecast_data
+        }
+        
+        print(f"🎉 Response ready for {symbol}")
+        return jsonify(response_data)
+        
     except Exception as e:
-        print(f"Error fetching {symbol}: {e}")
+        print(f"❌ Error fetching {symbol}: {e}")
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/health', methods=['GET'])
