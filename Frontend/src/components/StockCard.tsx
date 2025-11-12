@@ -61,15 +61,20 @@ interface StockCardStackProps {
 
 // Helper to safely format numbers
 const formatNumber = (num: number | undefined | null, decimals = 2) => {
-  return num != null ? num.toFixed(decimals) : "-";
+  if (num == null) return "-";
+  const numValue = typeof num === 'number' ? num : Number(num);
+  if (isNaN(numValue) || !isFinite(numValue)) return "-";
+  return numValue.toFixed(decimals);
 };
 
 // Helper to format volume
 const formatVolume = (vol: number | undefined | null) => {
-  if (!vol) return "-";
-  if (vol >= 1_000_000) return (vol / 1_000_000).toFixed(1) + "M";
-  if (vol >= 1_000) return (vol / 1_000).toFixed(1) + "K";
-  return vol.toString();
+  if (vol == null) return "-";
+  const volValue = typeof vol === 'number' ? vol : Number(vol);
+  if (isNaN(volValue) || !isFinite(volValue)) return "-";
+  if (volValue >= 1_000_000) return (volValue / 1_000_000).toFixed(1) + "M";
+  if (volValue >= 1_000) return (volValue / 1_000).toFixed(1) + "K";
+  return volValue.toString();
 };
 
 // Helper to format market cap
@@ -106,6 +111,270 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   }
   return null;
 };
+
+// StockCard component for individual card rendering
+interface StockCardProps {
+  stock: Stock;
+  detail?: StockDetail;
+  isActive: boolean;
+  timeframe: "day" | "month" | "year" | "all";
+  setTimeframe: (timeframe: "day" | "month" | "year" | "all") => void;
+  onClick: () => void;
+  chartData?: ChartDataPoint[];
+}
+
+export function StockCard({
+  stock,
+  detail,
+  isActive,
+  timeframe,
+  setTimeframe,
+  onClick,
+  chartData = [],
+}: StockCardProps) {
+  const combinedChartData = chartData || [];
+  const currentDetail = detail;
+
+  return (
+    <div
+      className="w-full h-full rounded-lg bg-white shadow-sm p-6 flex flex-col gap-4 border border-gray-200 hover:border-[#9DB38A] transition-all duration-300"
+      onClick={onClick}
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-gray-900 text-3xl font-bold">{stock.symbol}</h3>
+          <p className="text-gray-600 text-sm mt-1">{stock.company}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-gray-900 text-3xl font-bold">
+            ${formatNumber(stock.price)}
+          </p>
+          <p
+            className={`text-lg font-semibold ${
+              stock.change >= 0 ? "text-[#9DB38A]" : "text-[#c17b7b]"
+            }`}
+          >
+            {stock.change >= 0 ? "+" : ""}
+            {formatNumber(stock.change)} (
+            {stock.changePercent >= 0 ? "+" : ""}
+            {formatNumber(stock.changePercent)}%)
+          </p>
+        </div>
+      </div>
+
+      <div className="flex-shrink-0">
+        <div className="w-full h-64 rounded-lg bg-gray-50 border-2 border-gray-200 overflow-hidden relative">
+          {isActive && (
+            <div className="absolute top-2 left-2 text-xs bg-white/80 p-1 rounded z-10">
+              H:
+              {combinedChartData.filter((d) => d.type !== "forecast").length} F:
+              {combinedChartData.filter((d) => d.type === "forecast").length}
+            </div>
+          )}
+          {isActive && combinedChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={combinedChartData}>
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={(date) =>
+                    new Date(date).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })
+                  }
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  domain={["auto", "auto"]}
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={(value) => `${value}`}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="price"
+                  stroke={stock.change >= 0 ? "#9DB38A" : "#c17b7b"}
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls={true}
+                />
+                {combinedChartData.some((d) => d.type === "forecast") && (
+                  <Line
+                    type="monotone"
+                    dataKey="price"
+                    stroke="#3b82f6"
+                    strokeWidth={2.5}
+                    strokeDasharray="5 5"
+                    dot={false}
+                    connectNulls={true}
+                    data={combinedChartData.map((d) =>
+                      d.type === "forecast" ? d : { ...d, price: null }
+                    )}
+                  />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+              {isActive ? "Loading chart..." : "Chart"}
+            </div>
+          )}
+        </div>
+        {isActive &&
+          combinedChartData.some((d) => d.type === "forecast") && (
+            <div className="flex items-center justify-center gap-4 mt-2 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-4 h-0.5 bg-[#9DB38A]"></div>
+                <span className="text-gray-600">Historical</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-4 h-0.5 bg-blue-500 border-dashed border-t-2 border-blue-500"></div>
+                <span className="text-gray-600">Forecast</span>
+              </div>
+            </div>
+          )}
+      </div>
+
+      <div className="flex gap-2">
+        {["day", "month", "year"].map((tf) => (
+          <button
+            key={tf}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (tf !== "all") {
+                setTimeframe(tf as "day" | "month" | "year");
+              }
+            }}
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+              timeframe === tf
+                ? "bg-[#9DB38A] text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            {tf.charAt(0).toUpperCase() + tf.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-5 gap-3 h-[240px]">
+        <div className="col-span-2 grid grid-rows-2 gap-3">
+          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
+              Price Info
+            </p>
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Open:</span>
+                <span className="font-medium text-gray-900">
+                  ${formatNumber(currentDetail?.open)}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">High:</span>
+                <span className="font-medium text-gray-900">
+                  ${formatNumber(currentDetail?.high)}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Low:</span>
+                <span className="font-medium text-gray-900">
+                  ${formatNumber(currentDetail?.low)}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
+              Volume
+            </p>
+            <p className="text-lg font-bold text-gray-900">
+              {formatVolume(currentDetail?.volume)}
+            </p>
+            <p className="text-xs text-gray-600">
+              Avg: {formatVolume(currentDetail?.avgVolume)}
+            </p>
+          </div>
+        </div>
+
+        <div className="col-span-2 grid grid-rows-2 gap-3">
+          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
+              52W Range
+            </p>
+            <p className="text-xs text-gray-900 font-medium">
+              ${formatNumber(currentDetail?.fiftyTwoWeekLow)} - $
+              {formatNumber(currentDetail?.fiftyTwoWeekHigh)}
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+              {currentDetail?.fiftyTwoWeekLow != null &&
+                currentDetail?.fiftyTwoWeekHigh != null && (
+                  <div
+                    className="bg-[#9DB38A] h-2 rounded-full"
+                    style={{
+                      width: `${
+                        ((stock.price - currentDetail.fiftyTwoWeekLow) /
+                          (currentDetail.fiftyTwoWeekHigh -
+                            currentDetail.fiftyTwoWeekLow)) *
+                        100
+                      }%`,
+                    }}
+                  />
+                )}
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
+              Technicals
+            </p>
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">P/E:</span>
+                <span className="font-medium text-gray-900">
+                  {formatNumber(currentDetail?.peRatio)}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Sector:</span>
+                <span className="font-medium text-gray-900 truncate ml-2">
+                  {currentDetail?.sector || "-"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-span-1 bg-gradient-to-br from-[#eff3eb] to-blue-50 rounded-lg p-3 border-2 border-[#9DB38A] flex flex-col justify-between">
+          <div>
+            <p className="text-xs font-bold text-gray-700 uppercase mb-2">
+              AI Signal
+            </p>
+            <p
+              className={`text-2xl font-bold mb-1 ${
+                stock.changePercent >= 0 ? "text-[#9DB38A]" : "text-[#c17b7b]"
+              }`}
+            >
+              {stock.changePercent >= 0 ? "BUY" : "HOLD"}
+            </p>
+            <p className="text-xs text-gray-600 mb-3">
+              Confidence:{" "}
+              {Math.min(Math.abs(stock.changePercent * 10), 99).toFixed(0)}%
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-600">Target:</p>
+            <p className="text-sm font-bold text-gray-900">
+              $
+              {formatNumber(
+                stock.price * (1 + Math.abs(stock.changePercent) / 100)
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function StockCardStack({
   stocks,

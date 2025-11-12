@@ -368,7 +368,8 @@ export default function InsightsPage() {
             </>
           )}
         </div>
-      </div>
-    </main>
+      </main>
+    
+    </div>
   )
 }
