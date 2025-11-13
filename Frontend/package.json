@@ -22,7 +22,8 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "recharts": "^3.3.0",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "yahoo-finance2": "^3.10.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

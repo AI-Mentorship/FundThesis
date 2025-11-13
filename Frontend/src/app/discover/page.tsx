@@ -39,7 +39,8 @@ interface StockDetail {
   forecastData?: StockDetailPoint[];
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+// Use Next.js API routes instead of external Flask server
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 function DiscoverPage() {
   const [stocks, setStocks] = useState<Stock[]>([]);
@@ -86,7 +87,7 @@ function DiscoverPage() {
       try {
         const days = timeframe === "day" ? 7 : timeframe === "month" ? 30 : 365;
         console.log(`📡 Fetching details for ${symbol} (${days} days)...`);
-        const res = await fetch(`${API_URL}/api/stock/${symbol}?days=${days}`);
+        const res = await fetch(`/api/stock/${symbol}?days=${days}`);
 
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
@@ -172,11 +173,9 @@ function DiscoverPage() {
       }
       console.log(
         "📡 Fetching stocks from API...",
-        `${API_URL}/api/stocks?limit=20&offset=${offset}`
+        `/api/stocks?limit=20&offset=${offset}`
       );
-      const res = await fetch(
-        `${API_URL}/api/stocks?limit=20&offset=${offset}`
-      );
+      const res = await fetch(`/api/stocks?limit=20&offset=${offset}`);
 
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
@@ -199,9 +198,7 @@ function DiscoverPage() {
       setError(null); // Clear error on successful fetch
     } catch (err) {
       console.error("❌ Error fetching stocks:", err);
-      setError(
-        `Unable to connect to API server at ${API_URL}. Please ensure the backend server is running.`
-      );
+      setError(`Unable to fetch stock data. Please try again later.`);
       // Set empty array on error to prevent infinite loading state
       if (offset === 0) {
         setStocks([]);
