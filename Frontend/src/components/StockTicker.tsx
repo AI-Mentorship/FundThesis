@@ -9,7 +9,8 @@ interface StockData {
   changePercent?: number
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+// Use Next.js API routes instead of external Flask server
+const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
 const formatNumber = (value?: number, decimals = 2) =>
   typeof value === 'number' ? value.toFixed(decimals) : '-'
@@ -24,7 +25,7 @@ const StockTicker = () => {
 
     const fetchStocks = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/stocks?limit=30&offset=0`)
+        const response = await fetch(`/api/stocks?limit=30&offset=0`)
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
         const data = await response.json()
         if (!isMounted) return
