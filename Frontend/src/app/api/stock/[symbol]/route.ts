@@ -1,31 +1,315 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import YahooFinance from 'yahoo-finance2';
+
+type PriceSeriesPoint = {
+  date: string;
+  price: number;
+};
+
+type StockPriceSeriesRow = {
+  symbol: string;
+  price_series: unknown;
+  forecast_results?: unknown;
+  metadata?: Record<string, unknown> | null;
+  company_name?: string | null;
+};
 
 // Create a singleton instance
 const yahooFinance = new YahooFinance();
 
+function round(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function extractPriceFromPoint(point: any): number | null {
+  if (!point || typeof point !== 'object') {
+    return null;
+  }
+
+  const candidateKeys = ['price', 'close', 'closing_price', 'value', 'adjClose', 'adj_close'];
+  for (const key of candidateKeys) {
+    const value = point[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  return null;
+}
+
+function normaliseSeries(series: unknown): PriceSeriesPoint[] {
+  if (!Array.isArray(series)) {
+    return [];
+  }
+
+  return series
+    .map((point) => {
+      const price = extractPriceFromPoint(point);
+      if (price === null) {
+        return null;
+      }
+
+      const rawDate =
+        (point && typeof point === 'object' && 'date' in point && point.date) || null;
+      const dateValue = rawDate ? new Date(rawDate as string | number | Date) : null;
+
+      if (!dateValue || Number.isNaN(dateValue.getTime())) {
+        return null;
+      }
+
+      return {
+        date: dateValue.toISOString().split('T')[0],
+        price,
+      } satisfies PriceSeriesPoint;
+    })
+    .filter((point): point is PriceSeriesPoint => point !== null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function normaliseForecastSeries(data: unknown): PriceSeriesPoint[] {
+  if (!data) {
+    return [];
+  }
+
+  if (Array.isArray(data)) {
+    return normaliseSeries(data);
+  }
+
+  if (typeof data === 'object') {
+    const candidateArrays = [
+      (data as Record<string, unknown>).forecast,
+      (data as Record<string, unknown>).forecasts,
+      (data as Record<string, unknown>).data,
+      (data as Record<string, unknown>).series,
+    ];
+
+    for (const candidate of candidateArrays) {
+      if (Array.isArray(candidate)) {
+        return normaliseSeries(candidate);
+      }
+    }
+  }
+
+  return [];
+}
+
+function filterSeriesByDays(series: PriceSeriesPoint[], days: number): PriceSeriesPoint[] {
+  if (!Number.isFinite(days) || days <= 0) {
+    return series;
+  }
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+
+  return series.filter((point) => {
+    const pointDate = new Date(point.date);
+    if (Number.isNaN(pointDate.getTime())) {
+      return false;
+    }
+    return pointDate >= cutoff;
+  });
+}
+
+function extractCompanyName(row: StockPriceSeriesRow, fallbackSymbol: string): string {
+  if (typeof row.company_name === 'string' && row.company_name.trim().length > 0) {
+    return row.company_name.trim();
+  }
+
+  const metadata = row.metadata;
+  if (metadata && typeof metadata === 'object') {
+    const company = (metadata as Record<string, unknown>).company;
+    if (typeof company === 'string' && company.trim().length > 0) {
+      return company.trim();
+    }
+
+    const companyName = (metadata as Record<string, unknown>).company_name;
+    if (typeof companyName === 'string' && companyName.trim().length > 0) {
+      return companyName.trim();
+    }
+  }
+
+  return `${fallbackSymbol} Inc.`;
+}
+
+function extractNumber(
+  source: Record<string, unknown> | null | undefined,
+  keys: string[],
+  fallback = 0,
+): number {
+  if (!source || typeof source !== 'object') {
+    return fallback;
+  }
+
+  for (const key of keys) {
+    const value = (source as Record<string, unknown>)[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  return fallback;
+}
+
+function extractString(
+  source: Record<string, unknown> | null | undefined,
+  keys: string[],
+  fallback: string,
+): string {
+  if (!source || typeof source !== 'object') {
+    return fallback;
+  }
+
+  for (const key of keys) {
+    const value = (source as Record<string, unknown>)[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return fallback;
+}
+
+function buildResponseFromCached(
+  row: StockPriceSeriesRow,
+  symbol: string,
+  days: number,
+): Record<string, unknown> | null {
+  const series = normaliseSeries(row.price_series);
+  if (series.length === 0) {
+    return null;
+  }
+
+  const filteredSeries = filterSeriesByDays(series, days);
+  const historicalSeries = filteredSeries.length > 0 ? filteredSeries : series;
+
+  const latest = historicalSeries[historicalSeries.length - 1] ?? series[series.length - 1];
+  const previous =
+    series.length > 1
+      ? series[series.length - 2]
+      : historicalSeries.length > 1
+        ? historicalSeries[historicalSeries.length - 2]
+        : latest;
+
+  const price = latest.price;
+  const previousPrice = previous?.price ?? price;
+  const change = price - previousPrice;
+  const changePercent = previousPrice !== 0 ? (change / previousPrice) * 100 : 0;
+
+  const open = historicalSeries[0]?.price ?? price;
+  const high = historicalSeries.reduce((max, point) => Math.max(max, point.price), price);
+  const low = historicalSeries.reduce((min, point) => Math.min(min, point.price), price);
+
+  const fullPeriodHigh = series.reduce((max, point) => Math.max(max, point.price), price);
+  const fullPeriodLow = series.reduce((min, point) => Math.min(min, point.price), price);
+
+  const metadata = row.metadata ?? null;
+
+  const volume = extractNumber(metadata, ['volume', 'regular_market_volume'], 0);
+  const avgVolume = extractNumber(metadata, ['avgVolume', 'average_volume'], 0);
+  const marketCap = extractNumber(metadata, ['market_cap', 'marketCap'], 0);
+  const peRatio = extractNumber(metadata, ['pe_ratio', 'peRatio', 'trailingPE'], 0);
+  const dividendYield = extractNumber(
+    metadata,
+    ['dividend_yield', 'dividendYield'],
+    0,
+  );
+
+  const sector = extractString(metadata, ['sector'], 'N/A');
+  const industry = extractString(metadata, ['industry'], 'N/A');
+
+  const company = extractCompanyName(row, symbol);
+
+  const forecastSeries = normaliseForecastSeries(row.forecast_results);
+
+  return {
+    symbol,
+    company,
+    price: round(price),
+    change: round(change),
+    changePercent: round(changePercent),
+    open: round(open),
+    high: round(high),
+    low: round(low),
+    volume,
+    avgVolume,
+    fiftyTwoWeekHigh: round(fullPeriodHigh),
+    fiftyTwoWeekLow: round(fullPeriodLow),
+    marketCap,
+    peRatio: round(peRatio),
+    dividendYield,
+    sector,
+    industry,
+    chartData: historicalSeries.map((point) => ({
+      date: point.date,
+      price: round(point.price),
+    })),
+    forecastData: forecastSeries.map((point) => ({
+      date: point.date,
+      price: round(point.price),
+    })),
+  };
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ symbol: string }> }
+  { params }: { params: Promise<{ symbol: string }> },
 ) {
   try {
     const { symbol: symbolParam } = await params;
     const symbol = symbolParam.toUpperCase();
     const searchParams = request.nextUrl.searchParams;
     const days = parseInt(searchParams.get('days') || '30', 10);
-    
+
     console.log(`📊 Fetching stock detail for ${symbol}...`);
-    
-    // Fetch quote first
-    const quoteResult = await yahooFinance.quote(symbol);
-    
-    if (!quoteResult) {
-      return NextResponse.json(
-        { error: 'No data available for this symbol' },
-        { status: 404 }
-      );
+
+    const supabase = createRouteHandlerClient({ cookies });
+    const {
+      data: cachedRow,
+      error: cachedError,
+    } = await supabase
+      .from('stock_price_series')
+      .select('symbol, price_series, forecast_results, metadata, company_name')
+      .eq('symbol', symbol)
+      .maybeSingle();
+
+    if (cachedError) {
+      console.error(`Error loading cached stock series for ${symbol}:`, cachedError.message);
     }
-    
+
+    if (cachedRow) {
+      const cachedResponse = buildResponseFromCached(
+        cachedRow as StockPriceSeriesRow,
+        symbol,
+        days,
+      );
+
+      if (cachedResponse) {
+        console.log(`✅ Returning cached stock data for ${symbol}`);
+        return NextResponse.json(cachedResponse);
+      }
+    }
+
+    // Fallback to Yahoo Finance if cache is missing or invalid
+    const quoteResult = await yahooFinance.quote(symbol);
+
+    if (!quoteResult) {
+      return NextResponse.json({ error: 'No data available for this symbol' }, { status: 404 });
+    }
+
     const quote = quoteResult as {
       regularMarketPrice?: number;
       regularMarketOpen?: number;
@@ -43,79 +327,78 @@ export async function GET(
       longName?: string;
       shortName?: string;
     };
-    
-    // Fetch historical data with error handling
+
     let historical: Array<{ date?: Date | string; close?: number; volume?: number }> = [];
     try {
-      // yahoo-finance2 supports: '1d', '1wk', '1mo' intervals
       const interval = days <= 30 ? '1d' : days <= 365 ? '1d' : '1wk';
       const historicalResult = await yahooFinance.historical(symbol, {
         period1: new Date(Date.now() - days * 24 * 60 * 60 * 1000),
         period2: new Date(),
-        interval: interval as '1d' | '1wk' | '1mo'
+        interval: interval as '1d' | '1wk' | '1mo',
       });
       historical = Array.isArray(historicalResult) ? historicalResult : [];
     } catch (error) {
       console.error(`Error fetching historical data for ${symbol}:`, error);
       historical = [];
     }
-    
+
     if (historical.length === 0) {
       return NextResponse.json(
         { error: 'No historical data available for this symbol' },
-        { status: 404 }
+        { status: 404 },
       );
     }
-    
+
     const currentPrice = quote.regularMarketPrice || 0;
     const openPrice = quote.regularMarketOpen || currentPrice;
     const change = currentPrice - openPrice;
     const changePercent = openPrice !== 0 ? (change / openPrice) * 100 : 0;
-    
-    // Format historical data for chart
-    const chartData = historical.map((item: { date?: Date | string; close?: number; volume?: number }) => ({
-      date: item.date instanceof Date ? item.date.toISOString().split('T')[0] : String(item.date || ''),
-      price: Math.round((item.close || 0) * 100) / 100,
-      volume: item.volume || 0
-    }));
-    
-    console.log(`✅ Historical data: ${chartData.length} points`);
-    
-    // Note: Forecasting would need to call Python backend or be implemented separately
-    // For now, we'll return empty forecast data
+
+    const chartData = historical.map(
+      (item: { date?: Date | string; close?: number; volume?: number }) => ({
+        date:
+          item.date instanceof Date
+            ? item.date.toISOString().split('T')[0]
+            : String(item.date || ''),
+        price: round(item.close || 0),
+        volume: item.volume || 0,
+      }),
+    );
+
+    console.log(`✅ Historical data from Yahoo: ${chartData.length} points`);
+
     const forecastData: Array<{ date: string; price: number }> = [];
-    
+
     const responseData = {
-      symbol: symbol,
+      symbol,
       company: quote.longName || quote.shortName || symbol,
-      price: Math.round(currentPrice * 100) / 100,
-      change: Math.round(change * 100) / 100,
-      changePercent: Math.round(changePercent * 100) / 100,
-      open: Math.round((quote.regularMarketOpen || 0) * 100) / 100,
-      high: Math.round((quote.regularMarketDayHigh || quote.fiftyTwoWeekHigh || 0) * 100) / 100,
-      low: Math.round((quote.regularMarketDayLow || quote.fiftyTwoWeekLow || 0) * 100) / 100,
+      price: round(currentPrice),
+      change: round(change),
+      changePercent: round(changePercent),
+      open: round(quote.regularMarketOpen || 0),
+      high: round(quote.regularMarketDayHigh || quote.fiftyTwoWeekHigh || 0),
+      low: round(quote.regularMarketDayLow || quote.fiftyTwoWeekLow || 0),
       volume: quote.regularMarketVolume || 0,
       avgVolume: quote.averageVolume || 0,
-      fiftyTwoWeekHigh: Math.round((quote.fiftyTwoWeekHigh || 0) * 100) / 100,
-      fiftyTwoWeekLow: Math.round((quote.fiftyTwoWeekLow || 0) * 100) / 100,
+      fiftyTwoWeekHigh: round(quote.fiftyTwoWeekHigh || 0),
+      fiftyTwoWeekLow: round(quote.fiftyTwoWeekLow || 0),
       marketCap: quote.marketCap || 0,
-      peRatio: quote.trailingPE ? Math.round(quote.trailingPE * 100) / 100 : 0,
+      peRatio: quote.trailingPE ? round(quote.trailingPE) : 0,
       dividendYield: quote.dividendYield || 0,
       sector: quote.sector || 'N/A',
       industry: quote.industry || 'N/A',
-      chartData: chartData,
-      forecastData: forecastData
+      chartData,
+      forecastData,
     };
-    
-    console.log(`🎉 Response ready for ${symbol}`);
+
+    console.log(`🎉 Response ready for ${symbol} (Yahoo fallback)`);
     return NextResponse.json(responseData);
-    
   } catch (error) {
     const { symbol: symbolParam } = await params;
     console.error(`❌ Error fetching ${symbolParam}:`, error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
