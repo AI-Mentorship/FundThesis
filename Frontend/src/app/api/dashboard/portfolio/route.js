@@ -123,6 +123,49 @@ export async function POST(request) {
   }
 }
 
+export async function DELETE(request) {
+  try {
+    const supabase = createRouteHandlerClient({ cookies });
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) {
+      console.error('Error fetching authenticated user:', userError.message);
+      return NextResponse.json({ error: 'Failed to retrieve user session' }, { status: 500 });
+    }
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const rawTicker = typeof body?.ticker === 'string' ? body.ticker : '';
+    const ticker = rawTicker.trim().toUpperCase();
+
+    if (ticker.length === 0) {
+      return NextResponse.json({ error: 'Ticker is required' }, { status: 400 });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('user_account')
+      .delete()
+      .match({ user_id: user.id, stock_ticker: ticker });
+
+    if (deleteError) {
+      console.error('Error deleting ticker from user_account:', deleteError.message);
+      return NextResponse.json({ error: 'Failed to delete ticker' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, ticker });
+  } catch (error) {
+    console.error('Unexpected error deleting ticker:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
+
 function extractTickers(rows) {
   const tickerSet = new Set();
 

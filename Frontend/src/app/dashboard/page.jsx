@@ -129,6 +129,8 @@ export default function DashboardPage() {
   const [tickerInput, setTickerInput] = useState('');
   const [isSavingTicker, setIsSavingTicker] = useState(false);
   const [addTickerError, setAddTickerError] = useState(null);
+  const [deletingTicker, setDeletingTicker] = useState(null);
+  const [tickerActionError, setTickerActionError] = useState(null);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -232,6 +234,7 @@ export default function DashboardPage() {
   const openAddTickerModal = () => {
     setTickerInput('');
     setAddTickerError(null);
+    setTickerActionError(null);
     setIsAddTickerOpen(true);
   };
 
@@ -291,6 +294,7 @@ export default function DashboardPage() {
 
       setIsAddTickerOpen(false);
       setTickerInput('');
+      setTickerActionError(null);
       await loadPortfolio();
     } catch (error) {
       const message =
@@ -300,6 +304,68 @@ export default function DashboardPage() {
       setIsSavingTicker(false);
     }
   };
+
+  const handleDeleteTicker = useCallback(
+    async (symbol) => {
+      const normalisedTicker = typeof symbol === 'string' ? symbol.trim().toUpperCase() : '';
+
+      if (normalisedTicker.length === 0 || !isMountedRef.current) {
+        return;
+      }
+
+      setTickerActionError(null);
+      setDeletingTicker(normalisedTicker);
+
+      try {
+        const response = await fetch('/api/dashboard/portfolio', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ ticker: normalisedTicker }),
+        });
+
+        let payload = null;
+        try {
+          payload = await response.json();
+        } catch (error) {
+          payload = null;
+        }
+
+        if (!response.ok) {
+          const message =
+            (payload && typeof payload.error === 'string' && payload.error.length > 0
+              ? payload.error
+              : null) ?? 'Failed to delete ticker';
+          if (isMountedRef.current) {
+            setTickerActionError(message);
+          }
+          return;
+        }
+
+        if (payload && typeof payload.message === 'string' && payload.message.length > 0) {
+          if (isMountedRef.current) {
+            setTickerActionError(payload.message);
+          }
+          return;
+        }
+
+        await loadPortfolio();
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Unexpected error occurred while deleting ticker';
+        if (isMountedRef.current) {
+          setTickerActionError(message);
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setDeletingTicker(null);
+        }
+      }
+    },
+    [loadPortfolio],
+  );
 
   const displayName = useMemo(() => {
     const fullName =
@@ -407,19 +473,34 @@ export default function DashboardPage() {
               <h3 className="text-sm font-semibold text-slate-600">Tracked Tickers</h3>
               {tickers.length > 0 ? (
                 <ul className="mt-3 flex flex-wrap gap-2">
-                  {tickers.map((ticker) => (
-                    <li
-                      key={ticker}
-                      className="rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm"
-                    >
-                      {ticker}
-                    </li>
-                  ))}
+                  {tickers.map((ticker) => {
+                    const isDeleting = deletingTicker === ticker;
+                    return (
+                      <li
+                        key={ticker}
+                        className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm"
+                      >
+                        <span>{ticker}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTicker(ticker)}
+                          disabled={isDeleting}
+                          className="rounded-full border border-transparent px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-200 hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:text-slate-300"
+                          aria-label={`Remove ${ticker} from portfolio`}
+                        >
+                          {isDeleting ? 'Removing…' : 'Remove'}
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <p className="mt-3 text-sm text-slate-500">
                   No tickers in your portfolio yet. Use the button below to add one.
                 </p>
+              )}
+              {tickerActionError && (
+                <p className="mt-3 text-sm font-medium text-red-600">{tickerActionError}</p>
               )}
               <Button
                 variant="outline"
