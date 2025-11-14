@@ -1,11 +1,17 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+'use client';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
-// Create client with fallback values to allow build to succeed
-// The client will error when actually used if env vars are missing
-export const supabase: SupabaseClient = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
-);
+type BrowserSupabaseClient = ReturnType<typeof createBrowserSupabaseClient>;
+
+let browserSupabase: BrowserSupabaseClient | null = null;
+
+export function getSupabaseClient(): BrowserSupabaseClient {
+  if (!browserSupabase) {
+    browserSupabase = createBrowserSupabaseClient();
+  }
+
+  return browserSupabase;
+}
+
+export const supabase = getSupabaseClient();
