@@ -13,7 +13,6 @@ type StockPriceSeriesRow = {
   price_series: unknown;
   forecast_results?: unknown;
   metadata?: Record<string, unknown> | null;
-  company_name?: string | null;
 };
 
 type StockSummary = {
@@ -106,20 +105,25 @@ function normalisePriceSeries(series: unknown): PriceSeriesPoint[] {
 }
 
 function extractCompanyName(row: StockPriceSeriesRow, symbol: string): string {
-  if (typeof row.company_name === 'string' && row.company_name.trim().length > 0) {
-    return row.company_name.trim();
-  }
-
   const metadata = row.metadata;
-  if (metadata && typeof metadata.company === 'string' && metadata.company.trim().length > 0) {
-    return metadata.company.trim();
-  }
-  if (
-    metadata &&
-    typeof metadata.company_name === 'string' &&
-    metadata.company_name.trim().length > 0
-  ) {
-    return metadata.company_name.trim();
+  if (metadata && typeof metadata === 'object') {
+    const record = metadata as Record<string, unknown>;
+    const candidateKeys = [
+      'company',
+      'company_name',
+      'name',
+      'companyName',
+      'longName',
+      'shortName',
+      'title',
+    ];
+
+    for (const key of candidateKeys) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
   }
 
   return `${symbol} Inc.`;
@@ -197,7 +201,7 @@ export async function GET(request: NextRequest) {
       error: cachedError,
     } = await supabase
       .from('stock_price_series')
-      .select('symbol, price_series, forecast_results, metadata, company_name')
+      .select('symbol, price_series, forecast_results')
       .in('symbol', paginatedSymbols);
 
     if (cachedError) {

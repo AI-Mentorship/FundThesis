@@ -85,64 +85,63 @@ export default function PortfolioPage() {
     if (!isMountedRef.current) {
       return;
     }
-
+  
     if (symbols.length === 0) {
       setHoldings([]);
       setHoldingsError(null);
       return;
     }
-
+  
     setIsLoadingHoldings(true);
     setHoldingsError(null);
-
+  
     try {
-      const results = await Promise.all(
-        symbols.map(async (symbol) => {
-          try {
-            const response = await fetch(`/api/stock/${symbol}`, {
-              method: "GET",
-              credentials: "include",
-            });
-
-            if (!response.ok) {
-              throw new Error(`Failed to load quote for ${symbol}`);
-            }
-
-            const payload = (await response.json()) as StockQuoteResponse;
-            const { text, isPositive } = formatGainLoss(
-              payload.change ?? 0,
-              payload.changePercent ?? 0
-            );
-
-            return {
-              symbol: payload.symbol ?? symbol,
-              shares: 1,
-              price: formatCurrency(payload.price ?? 0),
-              value: formatCurrency(payload.price ?? 0),
-              gainLoss: text,
-              isPositive,
-            } satisfies HoldingRow;
-          } catch (error) {
-            console.error("Failed to load holding data:", error);
-            return null;
-          }
-        })
-      );
-
+      // Use the dashboard API which already has all the data!
+      const response = await fetch("/api/dashboard/portfolio", {
+        method: "GET",
+        credentials: "include",
+      });
+  
+      if (!response.ok) {
+        throw new Error("Failed to load portfolio data");
+      }
+  
+      const payload = await response.json();
+      
       if (!isMountedRef.current) {
         return;
       }
-
-      const validHoldings = results.filter(
-        (item): item is HoldingRow => item !== null
-      );
-      setHoldings(validHoldings);
-
-      if (validHoldings.length !== symbols.length) {
-        setHoldingsError(
-          "Some tickers could not load price data. Please try again later."
-        );
+  
+      // Get the latest price from performance data
+      const performance = payload.performance || [];
+      const summary = payload.summary || null;
+      
+      if (performance.length === 0 || !summary) {
+        setHoldingsError("No price data available yet.");
+        setHoldings([]);
+        return;
       }
+  
+      // Calculate holdings from the summary data
+      const holdings: HoldingRow[] = symbols.map((symbol) => {
+        // Use the summary to get basic price info
+        const price = summary.latestValue || 100; // From index value
+        const change = summary.dailyChange || 0;
+        const changePercent = summary.dailyChange || 0;
+        
+        const { text, isPositive } = formatGainLoss(change, changePercent);
+  
+        return {
+          symbol,
+          shares: 1,
+          price: formatCurrency(price),
+          value: formatCurrency(price),
+          gainLoss: text,
+          isPositive,
+        };
+      });
+  
+      setHoldings(holdings);
     } catch (error) {
       if (isMountedRef.current) {
         console.error("Unexpected holdings load error:", error);
@@ -155,6 +154,7 @@ export default function PortfolioPage() {
       }
     }
   }, []);
+
 
   const loadPortfolio = useCallback(async () => {
     if (!isMountedRef.current) {

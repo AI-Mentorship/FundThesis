@@ -207,21 +207,46 @@ async function loadHistories(supabase, tickers) {
 
 async function fetchCachedPrices(supabase, ticker) {
   const { data, error } = await supabase
-    .from('price_data')
-    .select('ticker, date, close')
-    .eq('ticker', ticker)
-    .order('date', { ascending: true });
+    .from('stock_price_series')
+    .select('price_series')
+    .eq('symbol', ticker)
+    .single();
 
   if (error) {
     console.error(`Error fetching cached price data for ${ticker}:`, error.message);
     return [];
   }
 
-  return (data ?? []).map((entry) => ({
-    ticker,
-    date: entry.date,
-    close: typeof entry.close === 'number' ? entry.close : Number(entry.close ?? 0),
-  }));
+  if (!data || !data.price_series || !Array.isArray(data.price_series)) {
+    return [];
+  }
+
+  // Transform the OHLCV data to match expected format
+  return data.price_series
+    .map((entry) => {
+      // Handle both ISO date strings and regular date strings
+      let dateStr;
+      if (entry.Date) {
+        const dateObj = new Date(entry.Date);
+        dateStr = dateObj.toISOString().split('T')[0];
+      } else {
+        return null;
+      }
+
+      const close = typeof entry.Close === 'number' ? entry.Close : Number(entry.Close ?? 0);
+      
+      if (!dateStr || Number.isNaN(close)) {
+        return null;
+      }
+
+      return {
+        ticker,
+        date: dateStr,
+        close,
+      };
+    })
+    .filter((row) => row !== null)
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 async function downloadAndCachePrices(supabase, ticker) {
@@ -261,12 +286,38 @@ async function downloadAndCachePrices(supabase, ticker) {
       return [];
     }
 
+    // Format data to match your Python script's format (OHLCV with capital letters and ISO dates)
+    const ohlcvData = historical
+      .map((item) => {
+        const date = normaliseDate(item.date);
+        if (!date) return null;
+        
+        return {
+          Date: new Date(date).toISOString(), // ISO format to match Python script
+          Open: item.open || 0,
+          High: item.high || 0,
+          Low: item.low || 0,
+          Close: item.close || 0,
+          Volume: item.volume || 0,
+        };
+      })
+      .filter((row) => row !== null);
+
+    // Save to stock_price_series table with UPSERT (matching Python script behavior)
     const { error: insertError } = await supabase
-      .from('price_data')
-      .upsert(priceRows, { onConflict: 'ticker,date', ignoreDuplicates: true });
+      .from('stock_price_series')
+      .upsert(
+        { 
+          symbol: ticker, 
+          price_series: ohlcvData 
+        },
+        { onConflict: 'symbol' }
+      );
 
     if (insertError) {
       console.error(`Failed to cache price data for ${ticker}:`, insertError.message);
+    } else {
+      console.log(`✅ Cached ${ohlcvData.length} price points for ${ticker}`);
     }
 
     return priceRows;
