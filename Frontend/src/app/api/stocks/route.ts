@@ -21,6 +21,7 @@ type StockSummary = {
   price: number;
   change: number;
   changePercent: number;
+  forecastData: PriceSeriesPoint[];
 };
 
 // Create a singleton instance
@@ -129,6 +130,49 @@ function extractCompanyName(row: StockPriceSeriesRow, symbol: string): string {
   return `${symbol} Inc.`;
 }
 
+function normaliseForecastSeries(series: unknown): PriceSeriesPoint[] {
+  if (!Array.isArray(series)) {
+    return [];
+  }
+
+  return series
+    .map((point) => {
+      if (!point || typeof point !== 'object') {
+        return null;
+      }
+
+      const record = point as Record<string, unknown>;
+      const rawDate = record.date ?? record.Date ?? null;
+      const rawPrice = record.price ?? record.Price ?? record.value ?? record.prediction ?? null;
+
+      if (!rawDate) {
+        return null;
+      }
+
+      const date = new Date(rawDate as string | number | Date);
+      if (Number.isNaN(date.getTime())) {
+        return null;
+      }
+
+      const value =
+        typeof rawPrice === 'number'
+          ? rawPrice
+          : typeof rawPrice === 'string'
+            ? Number(rawPrice)
+            : null;
+
+      if (value === null || Number.isNaN(value)) {
+        return null;
+      }
+
+      return {
+        date: date.toISOString().split('T')[0],
+        price: Number(value),
+      } satisfies PriceSeriesPoint;
+    })
+    .filter((point): point is PriceSeriesPoint => point !== null);
+}
+
 function buildSummaryFromSeries(row: StockPriceSeriesRow): StockSummary | null {
   const series = normalisePriceSeries(row.price_series);
   if (series.length === 0) {
@@ -145,12 +189,15 @@ function buildSummaryFromSeries(row: StockPriceSeriesRow): StockSummary | null {
 
   const company = extractCompanyName(row, row.symbol);
 
+  const forecastData = normaliseForecastSeries(row.forecast_results);
+
   return {
     symbol: row.symbol,
     company,
     price: round(price),
     change: round(change),
     changePercent: round(changePercent),
+    forecastData,
   };
 }
 
@@ -178,6 +225,7 @@ async function fetchYahooSummary(symbol: string): Promise<StockSummary | null> {
       price: round(currentPrice),
       change: round(change),
       changePercent: round(changePercent),
+      forecastData: [],
     };
   } catch (error) {
     console.error(`Error fetching ${symbol} from Yahoo Finance:`, error);
@@ -255,11 +303,14 @@ export async function GET(request: NextRequest) {
       missingSymbols.map((symbol) => fetchYahooSummary(symbol)),
     );
     const yahooMap = new Map<string, StockSummary>();
-    yahooSummaries
-      .filter((summary): summary is StockSummary => summary !== null)
-      .forEach((summary) => {
-        yahooMap.set(summary.symbol.toUpperCase(), summary);
+  yahooSummaries.forEach((summary) => {
+    if (summary) {
+      yahooMap.set(summary.symbol.toUpperCase(), {
+        ...summary,
+        forecastData: [],
       });
+    }
+  });
 
     const stocks: StockSummary[] = [];
     paginatedSymbols.forEach((symbol) => {

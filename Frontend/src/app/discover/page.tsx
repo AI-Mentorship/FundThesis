@@ -17,6 +17,7 @@ interface Stock {
   price: number;
   change: number;
   changePercent: number;
+  forecastData?: StockDetailPoint[];
 }
 
 interface StockDetailPoint {
@@ -62,6 +63,97 @@ const getDaysForTimeframe = (tf: "day" | "month" | "year") => {
 
 const DEFAULT_PAGE_SIZE = 20;
 
+const normaliseSummaryForecast = (points: unknown): StockDetailPoint[] => {
+  if (!Array.isArray(points)) {
+    return [];
+  }
+
+  return points
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const record = entry as Record<string, unknown>;
+      const rawDate = record.date ?? record.Date;
+      const rawPrice = record.price ?? record.Price ?? record.value;
+
+      if (typeof rawDate !== "string" || rawDate.trim().length === 0) {
+        return null;
+      }
+
+      const parsedDate = new Date(rawDate);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return null;
+      }
+
+      let price: number | null = null;
+      if (typeof rawPrice === "number") {
+        price = rawPrice;
+      } else if (typeof rawPrice === "string" && rawPrice.trim().length > 0) {
+        const parsed = Number(rawPrice);
+        price = Number.isNaN(parsed) ? null : parsed;
+      }
+
+      if (price === null) {
+        return null;
+      }
+
+      return {
+        date: parsedDate.toISOString().split("T")[0],
+        price,
+      } satisfies StockDetailPoint;
+    })
+    .filter((point): point is StockDetailPoint => point !== null);
+};
+
+const mapApiStockSummary = (stock: {
+  symbol: string;
+  company?: string | null;
+  price: number;
+  change: number;
+  changePercent: number;
+  forecastData?: unknown;
+}): Stock => {
+  const forecastPoints = normaliseSummaryForecast(stock.forecastData);
+
+  return {
+    symbol: stock.symbol,
+    company:
+      stock.company && stock.company.trim().length > 0
+        ? stock.company
+        : `${stock.symbol} Inc.`,
+    price: stock.price,
+    change: stock.change,
+    changePercent: stock.changePercent,
+    forecastData: forecastPoints,
+  };
+};
+
+const createPlaceholderDetail = (
+  stock: Stock,
+  forecastPoints: StockDetailPoint[] = [],
+): StockDetail => ({
+  symbol: stock.symbol,
+  company: stock.company,
+  price: stock.price,
+  change: stock.change,
+  changePercent: stock.changePercent,
+  open: stock.price,
+  high: stock.price,
+  low: stock.price,
+  volume: 0,
+  avgVolume: 0,
+  fiftyTwoWeekHigh: undefined,
+  fiftyTwoWeekLow: undefined,
+  peRatio: undefined,
+  sector: "—",
+  industry: "—",
+  marketCap: 0,
+  chartData: [],
+  forecastData: forecastPoints,
+});
+
 function DiscoverPage() {
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [stockDetails, setStockDetails] = useState<{
@@ -77,6 +169,47 @@ function DiscoverPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
   const defaultOffsetRef = useRef(0);
+
+  const applyForecastToDetails = useCallback(
+    (incomingStocks: Stock[], { reset = false }: { reset?: boolean } = {}) => {
+      const entries = incomingStocks.filter(
+        (stock) => Array.isArray(stock.forecastData) && stock.forecastData.length > 0,
+      );
+
+      if (reset && entries.length === 0) {
+        setStockDetails({});
+        return;
+      }
+
+      if (entries.length === 0) {
+        return;
+      }
+
+      setStockDetails((prev) => {
+        const next = reset ? {} : { ...prev };
+
+        entries.forEach((stock) => {
+          const forecastPoints = stock.forecastData ?? [];
+          const existing = reset ? undefined : next[stock.symbol];
+
+          if (existing) {
+            next[stock.symbol] = {
+              ...existing,
+              price: stock.price,
+              change: stock.change,
+              changePercent: stock.changePercent,
+              forecastData: forecastPoints,
+            };
+          } else {
+            next[stock.symbol] = createPlaceholderDetail(stock, forecastPoints);
+          }
+        });
+
+        return next;
+      });
+    },
+    [],
+  );
 
   // Filter stocks based on search query
   const filteredStocks = useMemo(() => {
@@ -210,24 +343,11 @@ function DiscoverPage() {
         }
 
         const data = await res.json();
-        interface ApiStock {
-          symbol: string;
-          company?: string | null;
-          price: number;
-          change: number;
-          changePercent: number;
-        }
-
-        const mapped: Stock[] = data.stocks.map((s: ApiStock) => ({
-          symbol: s.symbol,
-          company:
-            s.company && s.company.trim().length > 0
-              ? s.company
-              : `${s.symbol} Inc.`,
-          price: s.price,
-          change: s.change,
-          changePercent: s.changePercent,
-        }));
+        const mapped: Stock[] = Array.isArray(data.stocks)
+          ? data.stocks.map((stock: unknown) =>
+              mapApiStockSummary(stock as Record<string, unknown> as any),
+            )
+          : [];
 
         defaultOffsetRef.current = offset + mapped.length;
         setHasMore(Boolean(data.hasMore));
@@ -240,6 +360,8 @@ function DiscoverPage() {
           );
           return reset ? newStocks : [...base, ...newStocks];
         });
+
+        applyForecastToDetails(mapped, { reset });
 
         setError(null);
       } catch (err) {
@@ -256,7 +378,7 @@ function DiscoverPage() {
         }
       }
     },
-    []
+    [applyForecastToDetails]
   );
 
   const checkAndLoadMore = (idx: number) => {
@@ -307,6 +429,7 @@ function DiscoverPage() {
             price: detail.price,
             change: detail.change,
             changePercent: detail.changePercent,
+            forecastData: detail.forecastData ?? [],
           };
 
           const filtered = prev.filter(
@@ -349,6 +472,7 @@ function DiscoverPage() {
 
       if (portfolioResponse.ok) {
         const payload = await portfolioResponse.json();
+        console.log("📦 Portfolio payload:", payload);
         const userTickers = Array.isArray(payload.tickers)
           ? Array.from(
               new Set(
@@ -360,6 +484,8 @@ function DiscoverPage() {
               )
             )
           : [];
+
+        console.log("🎯 User tickers extracted:", userTickers);
 
         if (userTickers.length > 0) {
           const symbolsParam = encodeURIComponent(userTickers.join(","));
@@ -373,30 +499,27 @@ function DiscoverPage() {
 
           if (stocksResponse.ok) {
             const data = await stocksResponse.json();
-            interface ApiStock {
-              symbol: string;
-              company?: string | null;
-              price: number;
-              change: number;
-              changePercent: number;
-            }
+            console.log("📊 Stocks API response:", data);
+            const mapped: Stock[] = Array.isArray(data.stocks)
+              ? data.stocks.map((stock: unknown) =>
+                  mapApiStockSummary(stock as Record<string, unknown> as any),
+                )
+              : [];
 
-            const mapped: Stock[] = data.stocks.map((s: ApiStock) => ({
-              symbol: s.symbol,
-              company:
-                s.company && s.company.trim().length > 0
-                  ? s.company
-                  : `${s.symbol} Inc.`,
-              price: s.price,
-              change: s.change,
-              changePercent: s.changePercent,
-            }));
+            console.log("✅ Mapped stocks for cards:", mapped);
 
             setStocks(mapped);
-            setHasMore(true);
+            applyForecastToDetails(mapped, { reset: true });
+            setHasMore(Boolean(data.hasMore));
             defaultOffsetRef.current = 0;
             setError(null);
             loadedFromUserPortfolio = true;
+
+            if (mapped.length > 0) {
+              await fetchStockDetail(mapped[0].symbol);
+            }
+          } else {
+            console.error("❌ Stocks API failed:", stocksResponse.status, await stocksResponse.text());
           }
         }
       }
@@ -411,7 +534,7 @@ function DiscoverPage() {
     if (!loadedFromUserPortfolio) {
       await fetchDefaultStocks({ reset: true, mode: "initial" });
     }
-  }, [fetchDefaultStocks]);
+  }, [applyForecastToDetails, fetchDefaultStocks, fetchStockDetail]);
 
   useEffect(() => {
     loadInitialStocks();
