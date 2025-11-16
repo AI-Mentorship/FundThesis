@@ -190,9 +190,38 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const symbolsParam = searchParams.get('symbols');
 
-    // Paginate symbols
-    const paginatedSymbols = SYMBOLS.slice(offset, offset + limit);
+    const customSymbols = symbolsParam
+      ? Array.from(
+          new Set(
+            symbolsParam
+              .split(',')
+              .map((symbol) => symbol.trim().toUpperCase())
+              .filter((symbol) => symbol.length > 0),
+          ),
+        )
+      : null;
+
+    const paginatedSymbols =
+      customSymbols && customSymbols.length > 0
+        ? customSymbols
+        : SYMBOLS.slice(offset, offset + limit);
+
+    if (paginatedSymbols.length === 0) {
+      return NextResponse.json({
+        stocks: [],
+        total: customSymbols ? 0 : SYMBOLS.length,
+        offset: customSymbols ? 0 : offset,
+        limit: customSymbols ? 0 : limit,
+        hasMore: false,
+      });
+    }
+
+    const responseOffset = customSymbols ? 0 : offset;
+    const responseLimit = customSymbols ? paginatedSymbols.length : limit;
+    const responseTotal = customSymbols ? customSymbols.length : SYMBOLS.length;
+    const responseHasMore = customSymbols ? false : offset + limit < SYMBOLS.length;
 
     const cookieStore = await cookies();
     const supabase = createRouteHandlerClient({
@@ -256,10 +285,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       stocks,
-      total: SYMBOLS.length,
-      offset,
-      limit,
-      hasMore: offset + limit < SYMBOLS.length,
+      total: responseTotal,
+      offset: responseOffset,
+      limit: responseLimit,
+      hasMore: responseHasMore,
     });
   } catch (error) {
     console.error('Error in /api/stocks:', error);

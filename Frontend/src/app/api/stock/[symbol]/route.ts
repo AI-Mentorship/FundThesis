@@ -470,7 +470,7 @@ export async function GET(
       error: cachedError,
     } = await supabase
       .from('stock_price_series')
-      .select('symbol, price_series, forecast_results,')
+      .select('symbol, price_series, forecast_results')
       .in('symbol', [symbol, rawSymbol]);
 
     if (cachedError) {

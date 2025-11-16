@@ -57,7 +57,6 @@ export default function PortfolioPage() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [holdings, setHoldings] = useState<HoldingRow[]>([]);
   const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(true);
-  const [isLoadingHoldings, setIsLoadingHoldings] = useState(false);
   const [portfolioError, setPortfolioError] = useState<string | null>(null);
   const [holdingsError, setHoldingsError] = useState<string | null>(null);
   const [isAddTickerOpen, setIsAddTickerOpen] = useState(false);
@@ -80,81 +79,6 @@ export default function PortfolioPage() {
       router.replace("/auth");
     }
   }, [isAuthLoading, userId, router]);
-
-  const loadHoldingsData = useCallback(async (symbols: string[]) => {
-    if (!isMountedRef.current) {
-      return;
-    }
-  
-    if (symbols.length === 0) {
-      setHoldings([]);
-      setHoldingsError(null);
-      return;
-    }
-  
-    setIsLoadingHoldings(true);
-    setHoldingsError(null);
-  
-    try {
-      // Use the dashboard API which already has all the data!
-      const response = await fetch("/api/dashboard/portfolio", {
-        method: "GET",
-        credentials: "include",
-      });
-  
-      if (!response.ok) {
-        throw new Error("Failed to load portfolio data");
-      }
-  
-      const payload = await response.json();
-      
-      if (!isMountedRef.current) {
-        return;
-      }
-  
-      // Get the latest price from performance data
-      const performance = payload.performance || [];
-      const summary = payload.summary || null;
-      
-      if (performance.length === 0 || !summary) {
-        setHoldingsError("No price data available yet.");
-        setHoldings([]);
-        return;
-      }
-  
-      // Calculate holdings from the summary data
-      const holdings: HoldingRow[] = symbols.map((symbol) => {
-        // Use the summary to get basic price info
-        const price = summary.latestValue || 100; // From index value
-        const change = summary.dailyChange || 0;
-        const changePercent = summary.dailyChange || 0;
-        
-        const { text, isPositive } = formatGainLoss(change, changePercent);
-  
-        return {
-          symbol,
-          shares: 1,
-          price: formatCurrency(price),
-          value: formatCurrency(price),
-          gainLoss: text,
-          isPositive,
-        };
-      });
-  
-      setHoldings(holdings);
-    } catch (error) {
-      if (isMountedRef.current) {
-        console.error("Unexpected holdings load error:", error);
-        setHoldings([]);
-        setHoldingsError("Failed to load holdings data.");
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setIsLoadingHoldings(false);
-      }
-    }
-  }, []);
-
 
   const loadPortfolio = useCallback(async () => {
     if (!isMountedRef.current) {
@@ -204,9 +128,8 @@ export default function PortfolioPage() {
         ? payload.tickers
         : [];
 
-      setTickers(fetchedTickers);
-
       if (fetchedTickers.length === 0) {
+        setTickers([]);
         setHoldings([]);
         setHoldingsError(null);
         setPortfolioError(
@@ -215,7 +138,44 @@ export default function PortfolioPage() {
         return;
       }
 
-      await loadHoldingsData(fetchedTickers);
+      const summary =
+        payload && typeof payload.summary === "object" ? payload.summary : null;
+
+      if (
+        !summary ||
+        typeof summary.latestValue !== "number" ||
+        Number.isNaN(summary.latestValue)
+      ) {
+        setTickers(fetchedTickers);
+        setHoldings([]);
+        setHoldingsError("Portfolio summary data is not available yet.");
+        return;
+      }
+
+      const price = summary.latestValue;
+      const change =
+        typeof summary.dailyChange === "number" ? summary.dailyChange : 0;
+      const changePercent =
+        typeof summary.dailyChangePercent === "number"
+          ? summary.dailyChangePercent
+          : 0;
+
+      const derivedHoldings: HoldingRow[] = fetchedTickers.map((symbol) => {
+        const { text, isPositive } = formatGainLoss(change, changePercent);
+
+        return {
+          symbol,
+          shares: 1,
+          price: formatCurrency(price),
+          value: formatCurrency(price),
+          gainLoss: text,
+          isPositive,
+        };
+      });
+
+      setTickers(fetchedTickers);
+      setHoldings(derivedHoldings);
+      setHoldingsError(null);
       setPortfolioError(null);
     } catch (error) {
       if (!isMountedRef.current) {
@@ -232,7 +192,7 @@ export default function PortfolioPage() {
         setIsLoadingPortfolio(false);
       }
     }
-  }, [loadHoldingsData, userId]);
+  }, [userId]);
 
   useEffect(() => {
     if (isAuthLoading) {
@@ -526,7 +486,7 @@ export default function PortfolioPage() {
           </section>
 
           <section className="mt-6">
-            {isLoadingPortfolio || isLoadingHoldings ? (
+            {isLoadingPortfolio ? (
               <div className="flex h-40 items-center justify-center rounded-xl border border-slate-200 bg-white">
                 <span className="text-sm text-slate-500">
                   Loading portfolio data…
