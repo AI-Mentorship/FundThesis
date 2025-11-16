@@ -6,9 +6,16 @@ import YahooFinance from 'yahoo-finance2';
 const yahooFinance = new YahooFinance();
 const DEFAULT_LOOKBACK_DAYS = 90;
 
+async function createSupabaseRouteClient() {
+  const cookieStore = await cookies();
+  return createRouteHandlerClient({
+    cookies: () => cookieStore,
+  });
+}
+
 export async function GET() {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createSupabaseRouteClient();
 
     const {
       data: { user },
@@ -61,7 +68,7 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createSupabaseRouteClient();
 
     const {
       data: { user },
@@ -125,7 +132,7 @@ export async function POST(request) {
 
 export async function DELETE(request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createSupabaseRouteClient();
 
     const {
       data: { user },

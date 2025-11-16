@@ -10,7 +10,10 @@ type AuthCallbackPayload = {
 
 export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({
+      cookies: () => cookieStore as unknown as ReturnType<typeof cookies>,
+    });
     const { event, session } = (await request.json()) as AuthCallbackPayload;
 
     if (event === 'SIGNED_OUT') {

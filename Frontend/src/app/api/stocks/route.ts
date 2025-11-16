@@ -194,7 +194,10 @@ export async function GET(request: NextRequest) {
     // Paginate symbols
     const paginatedSymbols = SYMBOLS.slice(offset, offset + limit);
 
-    const supabase = createRouteHandlerClient({ cookies });
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({
+      cookies: () => cookieStore as unknown as ReturnType<typeof cookies>,
+    });
 
     const {
       data: cachedRows,

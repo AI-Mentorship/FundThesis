@@ -461,7 +461,10 @@ export async function GET(
 
     console.log(`📊 Fetching stock detail for ${symbol}...`);
 
-    const supabase = createRouteHandlerClient({ cookies });
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({
+      cookies: () => cookieStore as unknown as ReturnType<typeof cookies>,
+    });
     const {
       data: cachedRows,
       error: cachedError,
@@ -475,11 +478,9 @@ export async function GET(
     }
 
     const cachedRow =
-      Array.isArray(cachedRows) && cachedRows.length > 0 ? cachedRows[0] : null;
+      Array.isArray(cachedRows) && cachedRows.length > 0 ? (cachedRows[0] as unknown) : null;
 
-    let row: StockPriceSeriesRow | null = cachedRow
-      ? (cachedRow as StockPriceSeriesRow)
-      : null;
+    let row: StockPriceSeriesRow | null = cachedRow ? (cachedRow as StockPriceSeriesRow) : null;
     const ensuredForecast = await ensureForecastData(supabase, symbol, row);
 
     if (row && ensuredForecast) {
