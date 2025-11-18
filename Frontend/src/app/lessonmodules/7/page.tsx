@@ -31,7 +31,7 @@ const Module7: React.FC = () => {
               </ul>
             </div>
 
-            {content.sections.map((s: any, idx: number) => (
+            {content.sections.map((s: { heading: string; body: string }, idx: number) => (
               <section key={idx} className="mb-8">
                 <h3 className="text-2xl font-semibold mb-3" style={{ fontFamily: content.layout?.format?.headerFont, color: content.layout?.format?.headerColor }}>{s.heading}</h3>
                 <div style={{ fontFamily: content.layout?.format?.bodyFont }} className="text-gray-800 leading-relaxed space-y-4">

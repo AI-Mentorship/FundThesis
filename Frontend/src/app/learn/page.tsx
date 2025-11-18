@@ -1,10 +1,10 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import StockTicker from "@/components/StockTicker";
 import ProgressRing from "@/app/lessonmodules/components/ProgressRing";
-import { getProgress } from "@/app/lessonmodules/data/userProgress";
+import { getProgress, resetAllProgress } from "@/app/lessonmodules/data/userProgress";
 
 const moduleTitles = [
   "Introduction to FundThesis",
@@ -161,4 +161,6 @@ const LearnPage: React.FC = () => {
       </main>
     </div>
   );
-}
+};
+
+export default LearnPage;
