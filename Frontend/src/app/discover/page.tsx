@@ -169,6 +169,10 @@ function DiscoverPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
   const defaultOffsetRef = useRef(0);
+  const timeframeRef = useRef<"day" | "month" | "year">(timeframe);
+  useEffect(() => {
+    timeframeRef.current = timeframe;
+  }, [timeframe]);
 
   const applyForecastToDetails = useCallback(
     (incomingStocks: Stock[], { reset = false }: { reset?: boolean } = {}) => {
@@ -267,7 +271,7 @@ function DiscoverPage() {
   );
 
   const fetchStockDetail = useCallback(
-    async (symbol: string, tf: "day" | "month" | "year" = timeframe) => {
+    async (symbol: string, tf: "day" | "month" | "year") => {
       try {
         const detail = await fetchStockDetailData(symbol, tf);
         setStockDetails((prev) => ({
@@ -280,7 +284,7 @@ function DiscoverPage() {
         return null;
       }
     },
-    [fetchStockDetailData, timeframe]
+    [fetchStockDetailData]
   );
 
   // Fetch stock details when currentIndex changes
@@ -294,9 +298,10 @@ function DiscoverPage() {
     );
     if (currentSymbol && !stockDetails[currentSymbol]) {
       console.log("🔍 Fetching details for:", currentSymbol);
-      fetchStockDetail(currentSymbol);
+      void fetchStockDetail(currentSymbol, timeframe);
     }
-  }, [currentIndex, stocks, fetchStockDetail]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, stocks]);
 
   // Refetch stock details when timeframe changes
   useEffect(() => {
@@ -308,9 +313,10 @@ function DiscoverPage() {
       currentSymbol
     );
     if (currentSymbol) {
-      fetchStockDetail(currentSymbol);
+      void fetchStockDetail(currentSymbol, timeframe);
     }
-  }, [timeframe, currentIndex, stocks, fetchStockDetail]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeframe]);
 
   const fetchDefaultStocks = useCallback(
     async (
@@ -407,7 +413,7 @@ function DiscoverPage() {
       if (existingIndex >= 0) {
         setCurrentIndex(existingIndex);
         if (!stockDetails[symbol]) {
-          await fetchStockDetail(symbol);
+          await fetchStockDetail(symbol, timeframe);
         }
         return;
       }
@@ -516,7 +522,7 @@ function DiscoverPage() {
             loadedFromUserPortfolio = true;
 
             if (mapped.length > 0) {
-              await fetchStockDetail(mapped[0].symbol);
+              await fetchStockDetail(mapped[0].symbol, timeframeRef.current);
             }
           } else {
             console.error("❌ Stocks API failed:", stocksResponse.status, await stocksResponse.text());
