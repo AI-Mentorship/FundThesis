@@ -1,5 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import YahooFinance from 'yahoo-finance2';
+
+type PriceSeriesPoint = {
+  date: string;
+  price: number;
+};
+
+type StockPriceSeriesRow = {
+  symbol: string;
+  price_series: unknown;
+  forecast_results?: unknown;
+  metadata?: Record<string, unknown> | null;
+};
+
+type StockSummary = {
+  symbol: string;
+  company: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  forecastData: PriceSeriesPoint[];
+};
 
 // Create a singleton instance
 const yahooFinance = new YahooFinance();
@@ -28,58 +51,308 @@ const SYMBOLS = [
   'SLB', 'HAL', 'BKR', 'NOV', 'FTI', 'HP', 'RIG', 'VAL', 'MRO', 'DVN'
 ];
 
+function round(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function extractPriceFromPoint(point: unknown): number | null {
+  if (!point || typeof point !== 'object') {
+    return null;
+  }
+
+  const record = point as Record<string, unknown>;
+  const candidateKeys = ['price', 'close', 'closing_price', 'value', 'adjClose', 'adj_close'];
+  for (const key of candidateKeys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  return null;
+}
+
+function normalisePriceSeries(series: unknown): PriceSeriesPoint[] {
+  if (!Array.isArray(series)) {
+    return [];
+  }
+
+  return series
+    .map((point) => {
+      const price = extractPriceFromPoint(point);
+      if (price === null) {
+        return null;
+      }
+
+      const rawDate =
+        point && typeof point === 'object'
+          ? ((point as Record<string, unknown>).date ?? null)
+          : null;
+      const dateValue = rawDate ? new Date(rawDate as string | number | Date) : null;
+
+      if (!dateValue || Number.isNaN(dateValue.getTime())) {
+        return null;
+      }
+
+      return {
+        date: dateValue.toISOString().split('T')[0],
+        price,
+      } satisfies PriceSeriesPoint;
+    })
+    .filter((point): point is PriceSeriesPoint => point !== null);
+}
+
+function extractCompanyName(row: StockPriceSeriesRow, symbol: string): string {
+  const metadata = row.metadata;
+  if (metadata && typeof metadata === 'object') {
+    const record = metadata as Record<string, unknown>;
+    const candidateKeys = [
+      'company',
+      'company_name',
+      'name',
+      'companyName',
+      'longName',
+      'shortName',
+      'title',
+    ];
+
+    for (const key of candidateKeys) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+  }
+
+  return `${symbol} Inc.`;
+}
+
+function normaliseForecastSeries(series: unknown): PriceSeriesPoint[] {
+  if (!Array.isArray(series)) {
+    return [];
+  }
+
+  return series
+    .map((point) => {
+      if (!point || typeof point !== 'object') {
+        return null;
+      }
+
+      const record = point as Record<string, unknown>;
+      const rawDate = record.date ?? record.Date ?? null;
+      const rawPrice =
+        record.price ??
+        record.Price ??
+        record.value ??
+        record.prediction ??
+        record.Predicted_Close ??
+        null;
+
+      if (!rawDate) {
+        return null;
+      }
+
+      const date = new Date(rawDate as string | number | Date);
+      if (Number.isNaN(date.getTime())) {
+        return null;
+      }
+
+      const value =
+        typeof rawPrice === 'number'
+          ? rawPrice
+          : typeof rawPrice === 'string'
+            ? Number(rawPrice)
+            : null;
+
+      if (value === null || Number.isNaN(value)) {
+        return null;
+      }
+
+      return {
+        date: date.toISOString().split('T')[0],
+        price: Number(value),
+      } satisfies PriceSeriesPoint;
+    })
+    .filter((point): point is PriceSeriesPoint => point !== null);
+}
+
+function buildSummaryFromSeries(row: StockPriceSeriesRow): StockSummary | null {
+  const series = normalisePriceSeries(row.price_series);
+  if (series.length === 0) {
+    return null;
+  }
+
+  const latest = series[series.length - 1];
+  const previous = series.length > 1 ? series[series.length - 2] : latest;
+
+  const price = latest.price;
+  const previousPrice = previous?.price ?? price;
+  const change = price - previousPrice;
+  const changePercent = previousPrice !== 0 ? (change / previousPrice) * 100 : 0;
+
+  const company = extractCompanyName(row, row.symbol);
+
+  const forecastData = normaliseForecastSeries(row.forecast_results);
+
+  return {
+    symbol: row.symbol,
+    company,
+    price: round(price),
+    change: round(change),
+    changePercent: round(changePercent),
+    forecastData,
+  };
+}
+
+async function fetchYahooSummary(symbol: string): Promise<StockSummary | null> {
+  try {
+    const quote = await yahooFinance.quote(symbol);
+
+    if (!quote || quote.regularMarketPrice === undefined) {
+      return null;
+    }
+
+    const currentPrice = quote.regularMarketPrice;
+    const openPrice = quote.regularMarketOpen || currentPrice;
+    const change = currentPrice - openPrice;
+    const changePercent = openPrice !== 0 ? (change / openPrice) * 100 : 0;
+
+    const companyName =
+      (quote.longName && typeof quote.longName === 'string' && quote.longName.length > 0
+        ? quote.longName
+        : quote.shortName) || `${symbol} Inc.`;
+
+    return {
+      symbol,
+      company: companyName,
+      price: round(currentPrice),
+      change: round(change),
+      changePercent: round(changePercent),
+      forecastData: [],
+    };
+  } catch (error) {
+    console.error(`Error fetching ${symbol} from Yahoo Finance:`, error);
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
-    
-    // Paginate symbols
-    const paginatedSymbols = SYMBOLS.slice(offset, offset + limit);
-    
-    const stockData = [];
-    
-    // Fetch stock data in parallel
-    const promises = paginatedSymbols.map(async (symbol) => {
-      try {
-        const quote = await yahooFinance.quote(symbol);
-        
-        if (quote && quote.regularMarketPrice !== undefined) {
-          const currentPrice = quote.regularMarketPrice;
-          const openPrice = quote.regularMarketOpen || currentPrice;
-          const change = currentPrice - openPrice;
-          const changePercent = openPrice !== 0 ? (change / openPrice) * 100 : 0;
-          
-          return {
-            symbol: symbol,
-            price: Math.round(currentPrice * 100) / 100,
-            change: Math.round(change * 100) / 100,
-            changePercent: Math.round(changePercent * 100) / 100
-          };
-        }
-        return null;
-      } catch (error) {
-        console.error(`Error fetching ${symbol}:`, error);
-        return null;
+    const symbolsParam = searchParams.get('symbols');
+
+    const customSymbols = symbolsParam
+      ? Array.from(
+          new Set(
+            symbolsParam
+              .split(',')
+              .map((symbol) => symbol.trim().toUpperCase())
+              .filter((symbol) => symbol.length > 0),
+          ),
+        )
+      : null;
+
+    const paginatedSymbols =
+      customSymbols && customSymbols.length > 0
+        ? customSymbols
+        : SYMBOLS.slice(offset, offset + limit);
+
+    if (paginatedSymbols.length === 0) {
+      return NextResponse.json({
+        stocks: [],
+        total: customSymbols ? 0 : SYMBOLS.length,
+        offset: customSymbols ? 0 : offset,
+        limit: customSymbols ? 0 : limit,
+        hasMore: false,
+      });
+    }
+
+    const responseOffset = customSymbols ? 0 : offset;
+    const responseLimit = customSymbols ? paginatedSymbols.length : limit;
+    const responseTotal = customSymbols ? customSymbols.length : SYMBOLS.length;
+    const responseHasMore = customSymbols ? false : offset + limit < SYMBOLS.length;
+
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({
+      cookies: () => cookieStore as unknown as ReturnType<typeof cookies>,
+    });
+
+    const {
+      data: cachedRows,
+      error: cachedError,
+    } = await supabase
+      .from('stock_price_series')
+      .select('symbol, price_series, forecast_results')
+      .in('symbol', paginatedSymbols);
+
+    if (cachedError) {
+      console.error('Error fetching cached stock price series:', cachedError.message);
+    }
+
+    const cachedMap = new Map<string, StockPriceSeriesRow>();
+    (cachedRows ?? []).forEach((row) => {
+      if (row && typeof row.symbol === 'string') {
+        cachedMap.set(row.symbol.toUpperCase(), row as StockPriceSeriesRow);
       }
     });
-    
-    const results = await Promise.all(promises);
-    const validStocks = results.filter((stock): stock is NonNullable<typeof stock> => stock !== null);
-    
+
+    const missingSymbols = paginatedSymbols.filter(
+      (symbol) => !cachedMap.has(symbol.toUpperCase()),
+    );
+
+    const yahooSummaries = await Promise.all(
+      missingSymbols.map((symbol) => fetchYahooSummary(symbol)),
+    );
+    const yahooMap = new Map<string, StockSummary>();
+  yahooSummaries.forEach((summary) => {
+    if (summary) {
+      yahooMap.set(summary.symbol.toUpperCase(), {
+        ...summary,
+        forecastData: [],
+      });
+    }
+  });
+
+    const stocks: StockSummary[] = [];
+    paginatedSymbols.forEach((symbol) => {
+      const upperSymbol = symbol.toUpperCase();
+      const cachedRow = cachedMap.get(upperSymbol);
+
+      if (cachedRow) {
+        const summary = buildSummaryFromSeries({
+          ...cachedRow,
+          symbol: upperSymbol,
+        });
+        if (summary) {
+          stocks.push(summary);
+          return;
+        }
+      }
+
+      const yahooSummary = yahooMap.get(upperSymbol);
+      if (yahooSummary) {
+        stocks.push(yahooSummary);
+      }
+    });
+
     return NextResponse.json({
-      stocks: validStocks,
-      total: SYMBOLS.length,
-      offset: offset,
-      limit: limit,
-      hasMore: (offset + limit) < SYMBOLS.length
+      stocks,
+      total: responseTotal,
+      offset: responseOffset,
+      limit: responseLimit,
+      hasMore: responseHasMore,
     });
   } catch (error) {
     console.error('Error in /api/stocks:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch stocks' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch stocks' }, { status: 500 });
   }
 }
 

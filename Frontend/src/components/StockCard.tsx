@@ -112,6 +112,72 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   return null;
 };
 
+interface ForecastGlanceProps {
+  points: ChartDataPoint[];
+  limit?: number;
+  className?: string;
+}
+
+const formatForecastDate = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+};
+
+function ForecastGlance({ points, limit = 3, className = "" }: ForecastGlanceProps) {
+  if (!points || points.length === 0) {
+    return null;
+  }
+
+  const ordered = [...points].sort((a, b) => a.date.localeCompare(b.date));
+  const preview = ordered.slice(0, limit);
+  const start = ordered[0];
+  const end = ordered[ordered.length - 1] ?? start;
+
+  const change = end.price - start.price;
+  const changePercent = start.price !== 0 ? (change / start.price) * 100 : 0;
+  const changeLabel = `${change >= 0 ? "+" : ""}${change.toFixed(2)} (${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%)`;
+  const changeClass = change >= 0 ? "text-green-600" : "text-red-600";
+
+  const gridCols =
+    preview.length === 1
+      ? "grid-cols-1"
+      : preview.length === 2
+        ? "grid-cols-2 sm:grid-cols-2"
+        : "grid-cols-2 sm:grid-cols-3";
+
+  return (
+    <div className={`mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4 shadow-sm ${className}`}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+          AI forecast outlook
+        </p>
+        <span className={`text-xs font-semibold ${changeClass}`}>{changeLabel}</span>
+      </div>
+      <div className={`mt-3 grid gap-2 ${gridCols}`}>
+        {preview.map((point) => (
+          <div
+            key={point.date}
+            className="rounded-lg border border-white/70 bg-white/80 px-3 py-2 shadow-sm"
+          >
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              {formatForecastDate(point.date)}
+            </p>
+            <p className="text-sm font-semibold text-slate-900">${point.price.toFixed(2)}</p>
+          </div>
+        ))}
+      </div>
+      {ordered.length > preview.length && (
+        <p className="mt-2 text-[11px] font-medium text-blue-600">
+          +{ordered.length - preview.length} more projected points
+        </p>
+      )}
+    </div>
+  );
+}
+
 // StockCard component for individual card rendering
 interface StockCardProps {
   stock: Stock;
@@ -134,6 +200,34 @@ export function StockCard({
 }: StockCardProps) {
   const combinedChartData = chartData || [];
   const currentDetail = detail;
+  const forecastPoints = useMemo(
+    () => combinedChartData.filter((point) => point.type === "forecast"),
+    [combinedChartData],
+  );
+  const historicalLineData = useMemo(
+    () =>
+      combinedChartData.map((point) =>
+        point.type === "forecast" ? { ...point, price: null } : point,
+      ),
+    [combinedChartData],
+  );
+  const forecastLineData = useMemo(() => {
+    if (forecastPoints.length === 0) {
+      return [];
+    }
+    const historicalPoints = combinedChartData.filter((point) => point.type !== "forecast");
+    const lastHistorical = historicalPoints[historicalPoints.length - 1] ?? null;
+
+    return combinedChartData.map((point) => {
+      if (point.type === "forecast") {
+        return point;
+      }
+      if (lastHistorical && point.date === lastHistorical.date) {
+        return lastHistorical;
+      }
+      return { ...point, price: null };
+    });
+  }, [combinedChartData, forecastPoints]);
 
   return (
     <div
@@ -197,9 +291,10 @@ export function StockCard({
                   stroke={stock.change >= 0 ? "#9DB38A" : "#c17b7b"}
                   strokeWidth={2}
                   dot={false}
-                  connectNulls={true}
+                  connectNulls={false}
+                  data={historicalLineData}
                 />
-                {combinedChartData.some((d) => d.type === "forecast") && (
+                {forecastLineData.length > 0 && (
                   <Line
                     type="monotone"
                     dataKey="price"
@@ -208,9 +303,7 @@ export function StockCard({
                     strokeDasharray="5 5"
                     dot={false}
                     connectNulls={true}
-                    data={combinedChartData.map((d) =>
-                      d.type === "forecast" ? d : { ...d, price: null }
-                    )}
+                    data={forecastLineData}
                   />
                 )}
               </LineChart>
@@ -256,6 +349,8 @@ export function StockCard({
           </button>
         ))}
       </div>
+
+  {isActive && forecastPoints.length > 0 && <ForecastGlance points={forecastPoints} />}
 
       <div className="grid grid-cols-5 gap-3 h-[240px]">
         <div className="col-span-2 grid grid-rows-2 gap-3">
@@ -388,6 +483,34 @@ export function StockCardStack({
   checkAndLoadMore,
 }: StockCardStackProps) {
   const [expandedStock, setExpandedStock] = useState<StockDetail | null>(null);
+  const forecastPoints = useMemo(
+    () => combinedChartData.filter((point) => point.type === "forecast"),
+    [combinedChartData],
+  );
+  const historicalLineData = useMemo(
+    () =>
+      combinedChartData.map((point) =>
+        point.type === "forecast" ? { ...point, price: null } : point,
+      ),
+    [combinedChartData],
+  );
+  const forecastLineData = useMemo(() => {
+    if (forecastPoints.length === 0) {
+      return [];
+    }
+    const historicalPoints = combinedChartData.filter((point) => point.type !== "forecast");
+    const lastHistorical = historicalPoints[historicalPoints.length - 1] ?? null;
+
+    return combinedChartData.map((point) => {
+      if (point.type === "forecast") {
+        return point;
+      }
+      if (lastHistorical && point.date === lastHistorical.date) {
+        return lastHistorical;
+      }
+      return { ...point, price: null };
+    });
+  }, [combinedChartData, forecastPoints]);
 
   // Calculate dynamic Y-axis domain based on all data points
   const getYAxisDomain = (data: ChartDataPoint[]) => {
@@ -616,32 +739,21 @@ export function StockCardStack({
                             strokeWidth={2}
                             dot={false}
                             connectNulls={false}
-                            data={combinedChartData.map((d) =>
-                              d.type !== "forecast" ? d : { ...d, price: null }
-                            )}
+                            data={historicalLineData}
                           />
                           
                           {/* Forecast line with connection point - clearly dashed */}
-                          {combinedChartData.some((d) => d.type === "forecast") && (
+                          {forecastLineData.length > 0 && (
                             <Line
                               type="monotone"
                               dataKey="price"
-                              stroke="#9DB38A"
+                              stroke="#3b82f6"
                               strokeWidth={2.5}
-                              strokeDasharray="8 4"
+                              strokeDasharray="5 5"
                               dot={false}
-                              connectNulls={false}
-                              opacity={0.8}
-                              data={(() => {
-                                const historicalPoints = combinedChartData.filter(d => d.type !== "forecast");
-                                const lastHistorical = historicalPoints[historicalPoints.length - 1];
-                                
-                                return combinedChartData.map((d) => {
-                                  if (d === lastHistorical) return d;
-                                  if (d.type === "forecast") return d;
-                                  return { ...d, price: null };
-                                });
-                              })()}
+                              connectNulls={true}
+                              opacity={0.9}
+                              data={forecastLineData}
                             />
                           )}
                         </LineChart>
@@ -653,25 +765,24 @@ export function StockCardStack({
                     )}
                   </div>
                   {/* Legend */}
-                  {index === currentIndex &&
-                    combinedChartData.some((d) => d.type === "forecast") && (
+                  {index === currentIndex && forecastLineData.length > 0 && (
                       <div className="flex items-center justify-center gap-4 mt-2 text-xs">
                         <div className="flex items-center gap-1">
                           <div className="w-4 h-0.5 bg-[#9DB38A]"></div>
                           <span className="text-gray-600">Historical</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <svg width="16" height="2" className="overflow-visible">
-                            <line 
-                              x1="0" 
-                              y1="1" 
-                              x2="16" 
-                              y2="1" 
-                              stroke="#9DB38A" 
-                              strokeWidth="2" 
-                              strokeDasharray="3,2"
-                            />
-                          </svg>
+                        <svg width="16" height="2" className="overflow-visible">
+                          <line
+                            x1="0"
+                            y1="1"
+                            x2="16"
+                            y2="1"
+                            stroke="#3b82f6"
+                            strokeWidth="2"
+                            strokeDasharray="3,2"
+                          />
+                        </svg>
                           <span className="text-gray-600">Forecast</span>
                         </div>
                       </div>
@@ -696,6 +807,10 @@ export function StockCardStack({
                     </button>
                   ))}
                 </div>
+
+            {index === currentIndex && forecastPoints.length > 0 && (
+              <ForecastGlance points={forecastPoints} className="mt-3" />
+            )}
 
                 {/* Price, Volume, 52W Range, Technicals */}
                 <div className="grid grid-cols-5 gap-3 h-[240px]">
@@ -842,6 +957,7 @@ export function StockCardStack({
           ...(liveStockDetail.chartData || []),
           ...(liveStockDetail.forecastData || []),
         ];
+        const expandedForecastPoints = expandedChartData.filter((d) => d.type === "forecast");
         
         return (
         <div
@@ -1024,6 +1140,8 @@ export function StockCardStack({
                   )}
                 </div>
               </div>
+
+              <ForecastGlance points={expandedForecastPoints} limit={6} />
 
               {/* Key Metrics Grid */}
               <div className="grid grid-cols-4 gap-4">
