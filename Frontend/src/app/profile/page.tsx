@@ -28,6 +28,7 @@ export default function ProfilePage() {
           </div>
         </div>
       </main>
+      
     </div>
   )
 }
