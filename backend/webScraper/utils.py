@@ -34,6 +34,20 @@ MIN_WORDS = 150
 load_dotenv()
 API_KEY = os.getenv("FINNHUB_KEY")
 
+# Common stock tickers for major exchanges (NYSE, NASDAQ)
+MAJOR_TICKERS = {
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK.B', 'V', 'JNJ',
+    'WMT', 'JPM', 'MA', 'PG', 'UNH', 'HD', 'DIS', 'BAC', 'VZ', 'ADBE', 'NFLX',
+    'PYPL', 'CMCSA', 'KO', 'PFE', 'NKE', 'INTC', 'T', 'CSCO', 'XOM', 'AVGO',
+    'COST', 'PEP', 'TMO', 'ABBV', 'MRK', 'CVX', 'WFC', 'ACN', 'DHR', 'MCD',
+    'NEE', 'LIN', 'BMY', 'QCOM', 'HON', 'AMGN', 'LOW', 'UPS', 'RTX', 'AMT',
+    'UBER', 'LYFT', 'SNAP', 'TWTR', 'SQ', 'SHOP', 'SPOT', 'ZM', 'DOCU', 'CRM',
+    'ORCL', 'IBM', 'AMD', 'MU', 'QRVO', 'LRCX', 'KLAC', 'AMAT', 'ASML', 'TSM'
+}
+
+# Extended list of common ticker patterns (1-5 letters)
+TICKER_PATTERN = re.compile(r'\b([A-Z]{1,5})\b')
+
 #SUPABASE setup
 from supabase import create_client, Client
 
@@ -83,6 +97,26 @@ def epoch_to_iso(epoch_val):
         return dt.isoformat()
     except Exception:
         return None
+
+
+def extract_tickers_from_text(text: str) -> list[str]:
+    """Extract potential stock tickers from text."""
+    if not text:
+        return []
+    
+    # Find all uppercase letter sequences (potential tickers)
+    potential_tickers = TICKER_PATTERN.findall(text.upper())
+    
+    # Filter to only known major tickers
+    found_tickers = [ticker for ticker in potential_tickers if ticker in MAJOR_TICKERS]
+    
+    # Also check if any tickers are mentioned explicitly in the text
+    text_upper = text.upper()
+    for ticker in MAJOR_TICKERS:
+        if ticker in text_upper and ticker not in found_tickers:
+            found_tickers.append(ticker)
+    
+    return list(set(found_tickers))  # Remove duplicates
 
 
 
@@ -304,7 +338,17 @@ def insert_into_supabase(article_db: dict,
         except Exception:
             published_iso = None
 
-    # --- 4. Build payload base ---
+    # --- 4. Extract tickers from article content ---
+    headline = article_db.get('headline', '') or ''
+    summary = article_db.get('summary', '') or ''
+    full_text_snippet = (text[:500] if text else '') or ''
+    combined_text = f"{headline} {summary} {full_text_snippet}"
+    tickers = extract_tickers_from_text(combined_text)
+    
+    # Convert tickers list to comma-separated string for storage
+    tickers_str = ','.join(tickers) if tickers else None
+
+    # --- 5. Build payload base ---
     payload = {
         "category": article_db.get('category'),
         "published_at": published_iso,
@@ -318,7 +362,8 @@ def insert_into_supabase(article_db: dict,
         "inserted_at": datetime.now(timezone.utc).isoformat(),
         "fetch_status": f"{status}:{http_status}|{meta.get('used_extractor')}|html={meta.get('html_len')}",
         "fetch_error": error,
-        "source_domain": domain
+        "source_domain": domain,
+        "tickers": tickers_str  # Add extracted tickers as comma-separated string
     }
 
     # --- 5. ONLY add sqlite_id/article_id if they look numeric ---
