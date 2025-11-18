@@ -63,6 +63,19 @@ const getDaysForTimeframe = (tf: "day" | "month" | "year") => {
 
 const DEFAULT_PAGE_SIZE = 20;
 
+const toFiniteNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  return null;
+};
+
 const normaliseSummaryForecast = (points: unknown): StockDetailPoint[] => {
   if (!Array.isArray(points)) {
     return [];
@@ -76,7 +89,8 @@ const normaliseSummaryForecast = (points: unknown): StockDetailPoint[] => {
 
       const record = entry as Record<string, unknown>;
       const rawDate = record.date ?? record.Date;
-      const rawPrice = record.price ?? record.Price ?? record.value;
+      const rawPrice =
+        record.price ?? record.Price ?? record.value ?? record.Predicted_Close ?? record.prediction;
 
       if (typeof rawDate !== "string" || rawDate.trim().length === 0) {
         return null;
@@ -107,25 +121,35 @@ const normaliseSummaryForecast = (points: unknown): StockDetailPoint[] => {
     .filter((point): point is StockDetailPoint => point !== null);
 };
 
-const mapApiStockSummary = (stock: {
-  symbol: string;
-  company?: string | null;
-  price: number;
-  change: number;
-  changePercent: number;
-  forecastData?: unknown;
-}): Stock => {
-  const forecastPoints = normaliseSummaryForecast(stock.forecastData);
+const mapApiStockSummary = (stock: unknown): Stock | null => {
+  if (!stock || typeof stock !== "object") {
+    return null;
+  }
+
+  const record = stock as Record<string, unknown>;
+  const symbol =
+    typeof record.symbol === "string" && record.symbol.trim().length > 0
+      ? record.symbol.trim().toUpperCase()
+      : null;
+  const price = toFiniteNumber(record.price);
+  const change = toFiniteNumber(record.change);
+  const changePercent = toFiniteNumber(record.changePercent);
+
+  if (!symbol || price === null || change === null || changePercent === null) {
+    return null;
+  }
+
+  const forecastPoints = normaliseSummaryForecast(record.forecastData);
 
   return {
-    symbol: stock.symbol,
+    symbol,
     company:
-      stock.company && stock.company.trim().length > 0
-        ? stock.company
-        : `${stock.symbol} Inc.`,
-    price: stock.price,
-    change: stock.change,
-    changePercent: stock.changePercent,
+      typeof record.company === "string" && record.company.trim().length > 0
+        ? record.company
+        : `${symbol} Inc.`,
+    price,
+    change,
+    changePercent,
     forecastData: forecastPoints,
   };
 };
@@ -350,9 +374,9 @@ function DiscoverPage() {
 
         const data = await res.json();
         const mapped: Stock[] = Array.isArray(data.stocks)
-          ? data.stocks.map((stock: unknown) =>
-              mapApiStockSummary(stock as Record<string, unknown> as any),
-            )
+          ? data.stocks
+              .map((stock: unknown) => mapApiStockSummary(stock))
+              .filter((stock: Stock | null): stock is Stock => stock !== null)
           : [];
 
         defaultOffsetRef.current = offset + mapped.length;
@@ -507,9 +531,9 @@ function DiscoverPage() {
             const data = await stocksResponse.json();
             console.log("📊 Stocks API response:", data);
             const mapped: Stock[] = Array.isArray(data.stocks)
-              ? data.stocks.map((stock: unknown) =>
-                  mapApiStockSummary(stock as Record<string, unknown> as any),
-                )
+              ? data.stocks
+                  .map((stock: unknown) => mapApiStockSummary(stock))
+                  .filter((stock: Stock | null): stock is Stock => stock !== null)
               : [];
 
             console.log("✅ Mapped stocks for cards:", mapped);

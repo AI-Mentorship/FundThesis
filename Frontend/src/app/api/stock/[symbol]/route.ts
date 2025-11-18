@@ -74,7 +74,7 @@ function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function extractPriceFromPoint(point: any): number | null {
+function extractPriceFromPoint(point: unknown): number | null {
   if (!point || typeof point !== 'object') {
     return null;
   }
@@ -91,10 +91,14 @@ function extractPriceFromPoint(point: any): number | null {
     'adjClose',
     'adj_close',
     'AdjClose',
+    'Predicted_Close',
+    'predicted_close',
   ];
 
+  const record = point as Record<string, unknown>;
+
   for (const key of candidateKeys) {
-    const value = (point as Record<string, unknown>)[key];
+    const value = record[key];
     if (typeof value === 'number' && Number.isFinite(value)) {
       return value;
     }
@@ -134,11 +138,11 @@ function normaliseSeries(series: unknown): PriceSeriesPoint[] {
       }
 
       const rawDate =
-        (point &&
-          typeof point === 'object' &&
-          (('date' in point && (point as any).date) ||
-            ('Date' in point && (point as any).Date))) ||
-        null;
+        point && typeof point === 'object'
+          ? ((point as Record<string, unknown>).date ??
+              (point as Record<string, unknown>).Date ??
+              null)
+          : null;
       const dateValue = rawDate ? new Date(rawDate as string | number | Date) : null;
 
       if (!dateValue || Number.isNaN(dateValue.getTime())) {
@@ -270,7 +274,7 @@ async function runPythonForecast(symbol: string): Promise<PriceSeriesPoint[] | n
 }
 
 async function generateAndCacheForecast(
-  supabase: SupabaseClient<any, any, any>,
+  supabase: SupabaseClient,
   symbol: string,
   hasExistingRow: boolean,
 ): Promise<PriceSeriesPoint[] | null> {
@@ -307,7 +311,7 @@ async function generateAndCacheForecast(
 }
 
 async function ensureForecastData(
-  supabase: SupabaseClient<any, any, any>,
+  supabase: SupabaseClient,
   symbol: string,
   row: StockPriceSeriesRow | null,
 ): Promise<PriceSeriesPoint[] | null> {
@@ -320,7 +324,31 @@ async function ensureForecastData(
 }
 
 function extractCompanyName(row: StockPriceSeriesRow, fallbackSymbol: string): string {
-  return row.symbol;
+  if (row.metadata && typeof row.metadata === 'object') {
+    const metadata = row.metadata as Record<string, unknown>;
+    const candidateKeys = [
+      'company',
+      'company_name',
+      'name',
+      'companyName',
+      'longName',
+      'shortName',
+      'title',
+    ];
+
+    for (const key of candidateKeys) {
+      const value = metadata[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+  }
+
+  if (typeof row.symbol === 'string' && row.symbol.trim().length > 0) {
+    return row.symbol;
+  }
+
+  return fallbackSymbol;
 }
 
 function extractNumber(

@@ -55,14 +55,15 @@ function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function extractPriceFromPoint(point: any): number | null {
+function extractPriceFromPoint(point: unknown): number | null {
   if (!point || typeof point !== 'object') {
     return null;
   }
 
+  const record = point as Record<string, unknown>;
   const candidateKeys = ['price', 'close', 'closing_price', 'value', 'adjClose', 'adj_close'];
   for (const key of candidateKeys) {
-    const value = point[key];
+    const value = record[key];
     if (typeof value === 'number' && Number.isFinite(value)) {
       return value;
     }
@@ -90,7 +91,9 @@ function normalisePriceSeries(series: unknown): PriceSeriesPoint[] {
       }
 
       const rawDate =
-        (point && typeof point === 'object' && 'date' in point && point.date) || null;
+        point && typeof point === 'object'
+          ? ((point as Record<string, unknown>).date ?? null)
+          : null;
       const dateValue = rawDate ? new Date(rawDate as string | number | Date) : null;
 
       if (!dateValue || Number.isNaN(dateValue.getTime())) {
@@ -143,7 +146,13 @@ function normaliseForecastSeries(series: unknown): PriceSeriesPoint[] {
 
       const record = point as Record<string, unknown>;
       const rawDate = record.date ?? record.Date ?? null;
-      const rawPrice = record.price ?? record.Price ?? record.value ?? record.prediction ?? null;
+      const rawPrice =
+        record.price ??
+        record.Price ??
+        record.value ??
+        record.prediction ??
+        record.Predicted_Close ??
+        null;
 
       if (!rawDate) {
         return null;
