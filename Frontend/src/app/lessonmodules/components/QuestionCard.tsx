@@ -11,6 +11,11 @@ type Props = {
 };
 
 const QuestionCard: React.FC<Props> = ({ question, onAnswer, showResult, locked }) => {
+  // Prepare sanitized explanation for correct answers to avoid repeating leading "Nice" or "Correct".
+  const sanitizedExplanation = showResult?.correct && showResult.explanation
+    ? showResult.explanation.replace(/^\s*(Nice|Correct),?\s*/i, '')
+    : '';
+
   return (
     <div className="bg-white p-4 rounded shadow text-black">
       <div className="text-lg font-semibold mb-3 text-black">{question.question}</div>
@@ -30,7 +35,7 @@ const QuestionCard: React.FC<Props> = ({ question, onAnswer, showResult, locked 
               <div className="flex items-center justify-between text-black">
                 <div className="text-black">{c}</div>
                 {isCorrectRevealed && <div className="text-green-600 font-semibold">Correct</div>}
-                {isSelectedWrong && <div className="text-red-600 font-semibold">Not quite</div>}
+                {isSelectedWrong && <div className="text-red-600 font-semibold">Incorrect</div>}
               </div>
               {/* show explanation only for the selected wrong choice */}
               {showResult && showResult.correct === false && showResult.selectedIndex === i && question.explanations && (
@@ -41,11 +46,11 @@ const QuestionCard: React.FC<Props> = ({ question, onAnswer, showResult, locked 
         })}
       </div>
       {showResult && showResult.correct && (
-        <div className="mt-3 text-green-700 font-semibold">Nice — {showResult.explanation ?? 'Good job!'}</div>
+        <div className="mt-3 text-green-700 font-semibold">
+          {`Nice${sanitizedExplanation ? ', ' + sanitizedExplanation : showResult.explanation ? '' : ', Good job!'}`}
+        </div>
       )}
-      {showResult && !showResult.correct && (
-        <div className="mt-3 text-red-700 font-semibold">Not quite — {showResult.explanation ?? 'Review explanation.'}</div>
-      )}
+      {/* When incorrect, only inline explanation is shown; no bottom block per new requirements */}
     </div>
   );
 };

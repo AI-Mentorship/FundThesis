@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
  
-import { getProgress } from '../lessonmodules/data/userProgress';
+import { getProgress, resetAllProgress } from '../lessonmodules/data/userProgress';
 import ProgressRing from '../lessonmodules/components/ProgressRing';
 
 // List of module titles in learning order. The demo lives at the final position (rendered as Module X).
@@ -46,30 +46,34 @@ const CircularRing: React.FC<{ percent: number; size?: number }> = ({ percent, s
 const LearnPage: React.FC = () => {
   const [progress, setProgress] = useState<number[]>(() => Array(moduleTitles.length).fill(0));
 
+  const reloadProgress = () => {
+    try {
+      const p = moduleTitles.map((_, i) => getProgress(i + 1, 4));
+      setProgress(p);
+    } catch (e) {/* ignore */}
+  };
+
   useEffect(() => {
-    // Load saved progress via the central helper (module indices are 1-based in storage).
-    const load = () => {
-      try {
-        const p = moduleTitles.map((_, i) => getProgress(i + 1, 4));
-        setProgress(p);
-      } catch (e) {
-        // ignore (safety for environments without localStorage)
-      }
-    };
-
-    load();
-
-    // Listen for our custom event (dispatched after writes) and storage events
-    // so progress updates in other components/tabs are reflected immediately.
-    const onChange = () => load();
+    reloadProgress();
+    const onChange = () => reloadProgress();
     window.addEventListener('ft-progress-changed', onChange);
     window.addEventListener('storage', onChange);
-
     return () => {
       window.removeEventListener('ft-progress-changed', onChange);
       window.removeEventListener('storage', onChange);
     };
   }, []);
+
+  const handleReset = () => {
+    if (typeof window !== 'undefined') {
+      const confirmReset = window.confirm('Reset all modules? This will lose all current progress.');
+      if (!confirmReset) return;
+      try {
+        resetAllProgress(); // triggers ft-progress-changed
+        reloadProgress();
+      } catch (e) {/* ignore */}
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -102,7 +106,19 @@ const LearnPage: React.FC = () => {
 
           <aside className="lg:col-span-3 flex flex-col items-center">
             <div className="w-full bg-white rounded-lg shadow p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">Progress</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-700">Progress</h3>
+                <button
+                  onClick={handleReset}
+                  aria-label="Reset all progress"
+                  className="p-1 text-gray-700 hover:text-gray-900 rounded focus:outline-none focus:ring-2 focus:ring-gray-300"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="1 4 1 10 7 10" />
+                    <path d="M3.51 15a9 9 0 1 0 .49-9.36" />
+                  </svg>
+                </button>
+              </div>
               <div className="flex flex-col items-center gap-4">
                 {moduleTitles.map((_, i) => {
                   const moduleNumber = i + 1;

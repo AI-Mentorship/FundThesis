@@ -65,11 +65,22 @@ const Module9: React.FC = () => {
           </div>
         </section>
 
-        {/* Prev/Next below quiz */}
+        {/* Prev/Home/Next below quiz */}
         <div className="flex justify-center mt-4">
-          <div className="w-full max-w-3xl flex justify-between">
-            <a href="/lessonmodules/8" className="px-4 py-2 bg-gray-700 text-white rounded">Previous Module</a>
-            <a href="/lessonmodules/10" className="px-4 py-2 bg-gray-700 text-white rounded">Next Module</a>
+          <div className="w-full max-w-3xl grid grid-cols-3 items-center">
+            <div className="flex justify-start">
+              <a href="/lessonmodules/8" className="px-4 py-2 bg-gray-700 text-white rounded">Previous Module</a>
+            </div>
+
+            <div className="flex justify-center">
+              <a href="/learn" aria-label="Home" className="w-10 h-10 rounded-full bg-gray-700 text-white flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline-block"><path d="M3 9.5L12 3l9 6.5"/><path d="M9 22V12h6v10"/></svg>
+              </a>
+            </div>
+
+            <div className="flex justify-end">
+              <a href="/lessonmodules/10" className="px-4 py-2 bg-gray-700 text-white rounded">Next Module</a>
+            </div>
           </div>
         </div>
       </main>
