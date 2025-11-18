@@ -1,10 +1,11 @@
 "use client";
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import QuestionCard from './QuestionCard';
 import Confetti from './Confetti';
 import { markQuestionAnswered } from '../data/userProgress';
 import { saveResult } from '@/lib/dummyProgressDB';
 import { Question } from './types';
+import { isQuestionAnswered } from '../data/quizNavigation';
 
 type Props = {
   moduleIndex: number;
@@ -12,11 +13,22 @@ type Props = {
 };
 
 const GridQuiz: React.FC<Props> = ({ moduleIndex, questions }) => {
-  // per-question result state: null | { correct, explanation? }
-  const [results, setResults] = useState<Array<{ correct: boolean; explanation?: string; selectedIndex?: number } | null>>(
-    () => questions.map(() => null)
+  // Initialize results based on previously answered questions
+  const [results, setResults] = useState<Array<{ correct: boolean; explanation?: string; selectedIndex?: number } | null>>(() => 
+    questions.map((q) => {
+      const answered = isQuestionAnswered(moduleIndex, q.id);
+      return answered ? { correct: true, explanation: undefined, selectedIndex: undefined } : null;
+    })
   );
   const [confettiOn, setConfettiOn] = useState(false);
+
+  // Re-initialize results when module or questions change
+  useEffect(() => {
+    setResults(questions.map((q) => {
+      const answered = isQuestionAnswered(moduleIndex, q.id);
+      return answered ? { correct: true, explanation: undefined, selectedIndex: undefined } : null;
+    }));
+  }, [moduleIndex, questions]);
 
   const handleAnswer = useCallback((qIndex: number, choiceIndex: number) => {
     const q = questions[qIndex];

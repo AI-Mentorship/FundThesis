@@ -1,11 +1,9 @@
 "use client";
 import React, { useEffect, useMemo, useState } from 'react';
 import { StockModel, TradeResult } from '../lib/stockModel';
-import Navbar from '../../../components/Navbar';
 import ModNav from '../components/ModNav';
-import StockTicker from '../../../components/StockTicker';
 import questionsByModule, { getQuestions } from '../data/moduleQuestions';
-import Confetti from '../../../components/Confetti';
+import Confetti from '../components/Confetti';
 // DecisionQuiz is defined in this file for the Module X assessment
 type Decision = 'BUY' | 'SELL' | 'HOLD' | null;
 
@@ -143,7 +141,7 @@ const Module10: React.FC = () => {
   function handleAssessmentAnswer(choice: Decision) {
     const s = decisionState.scenarios[decisionState.currentIndex];
     const isCorrect = choice === s.correct;
-    const feedback = `${isCorrect ? 'Correct.' : 'Not quite.'} ${s.explanation}`;
+    const feedback = s.explanation;
     setDecisionState(ds => {
       const answers = { ...ds.answers, [s.id]: { choice, correct: isCorrect, feedback, recommendedOrder: s.recommendedOrder } };
       const answeredIds = new Set(ds.answeredIds);
@@ -169,17 +167,15 @@ const Module10: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
 
-      {/* real stock ticker (demo moved to Module 10) */}
-      <StockTicker />
+      {/* StockTicker rendered globally via RootLayout */}
 
       <ModNav moduleIndex={10} totalModules={10} title="Demo" />
 
-      <main className="max-w-6xl mx-auto p-6">
-        <p className="max-w-3xl mx-auto text-gray-700 mb-6">This demo module combines live-like NVDA pricing and a short simulated news feed. Read the news snippets and use the trading tools to practice making buy, sell, or hold decisions — then try the short decision assessment below to see how those choices align with market signals.</p>
+      <main className="max-w-6xl mx-auto px-6">
+        <p className="text-gray-700 mb-6 pt-6">This demo module combines live-like NVDA pricing and a short simulated news feed. Read the news snippets and use the trading tools to practice making buy, sell, or hold decisions — then try the short decision assessment below to see how those choices align with market signals.</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2 bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -191,7 +187,7 @@ const Module10: React.FC = () => {
               </div>
             </div>
 
-            <div className="w-full bg-gray-50 p-4 rounded mb-4 text-black">
+            <div className="w-full bg-gray-50 p-4 rounded text-black">
               <label className="block text-sm font-semibold mb-1 text-black">Order Type</label>
               <select value={orderType} onChange={(e) => setOrderType(e.target.value as 'market' | 'limit' | 'stop')} className="w-full mb-3 p-2 border rounded">
                 <option value="market">Market</option>
@@ -214,18 +210,6 @@ const Module10: React.FC = () => {
                 <button onClick={doSell} className="px-4 py-2 bg-red-600 text-white rounded">Sell</button>
               </div>
             </div>
-
-            <div className="bg-white">
-              <h4 className="text-sm font-semibold mb-2 text-black">Trading History</h4>
-              <ul className="space-y-2 text-sm text-black">
-                {history.slice().reverse().map((t, i) => (
-                  <li key={i} className="flex justify-between">
-                    <div className="text-black"><span className={`font-semibold ${t.type === 'BUY' ? 'text-green-600' : 'text-red-600'}`}>{t.type}</span> {t.shares} @ ${t.price.toFixed(2)}</div>
-                    <div className="text-black">{t.time}</div>
-                  </li>
-                ))}
-              </ul>
-            </div>
           </div>
 
           <aside className="bg-white rounded-lg shadow p-6">
@@ -242,17 +226,15 @@ const Module10: React.FC = () => {
               )}
             </div>
           </aside>
-        </div>
 
-        {/* Module decision assessment (interactive using Buy/Sell clicks) */}
-        <div className="flex justify-center mt-6">
-          <div className="w-full max-w-3xl">
+          {/* Module decision assessment (interactive using Buy/Sell clicks) */}
+          <div className="md:col-span-3">
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold mb-4 text-black">Decision Assessment</h3>
 
               {/* feedback area & controls */}
               <div className="space-y-4">
-                <Confetti active={confettiActive} />
+                {confettiActive && <Confetti />}
                 {decisionState.scenarios[decisionState.currentIndex] ? (
                   <div>
                     <div className="text-sm text-gray-700 mb-2">Read the news on the right, then use the trading panel to choose Buy or Sell for this scenario.</div>
@@ -261,20 +243,21 @@ const Module10: React.FC = () => {
                                 (() => {
                                   const sid = decisionState.scenarios[decisionState.currentIndex].id;
                                   const ans = decisionState.answers[sid];
+                                  const capitalizedOrderType = ans.recommendedOrder ? ans.recommendedOrder.charAt(0).toUpperCase() + ans.recommendedOrder.slice(1) : '';
                                   return (
                                     <div className={`p-3 border rounded ${ans.correct ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                                       <div className={`font-semibold ${ans.correct ? 'text-green-700' : 'text-red-700'}`}>{ans.correct ? 'Correct' : 'Not quite'}</div>
                                       <div className="text-sm text-gray-700 mt-1">{ans.feedback}</div>
-                                      <div className="text-sm text-gray-600 mt-2">Recommended Order Type: <span className="font-semibold">{ans.recommendedOrder}</span></div>
-                                      <div className="mt-3 flex">
-                                        <button onClick={nextScenario} className="px-3 py-1 bg-blue-600 text-white rounded">Next</button>
+                                      <div className="text-sm text-gray-600 mt-2">Recommended Order Type: <span className="font-semibold">{capitalizedOrderType}</span></div>
+                                      <div className="mt-3 flex justify-end">
+                                        <button onClick={nextScenario} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors">Next</button>
                                       </div>
                                     </div>
                                   );
                                 })()
                               ) : (
                         <div className="p-3 border rounded bg-gray-50">
-                          <div className="text-sm text-gray-700">Awaiting your Buy or Sell choice from the trading panel.</div>
+                          <div className="text-sm text-gray-700">Awaiting your Buy or Sell decision.</div>
                         </div>
                       )}
                     </div>
@@ -293,8 +276,9 @@ const Module10: React.FC = () => {
             </div>
           </div>
         </div>
+
         {/* Prev/Exit below quiz */}
-        <div className="flex justify-center mt-4">
+        <div className="flex justify-center mt-6">
           <div className="w-full max-w-3xl flex justify-between">
             <a href="/lessonmodules/9" className="px-4 py-2 bg-gray-700 text-white rounded disabled:opacity-50">Previous Module</a>
             <a href="/learn" className="px-4 py-2 bg-gray-700 text-white rounded">Exit</a>

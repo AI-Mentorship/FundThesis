@@ -1,7 +1,5 @@
 "use client";
 import React from 'react';
-import Navbar from '../../../components/Navbar';
-import StockTicker from '../../../components/StockTicker';
 import ModNav from '../components/ModNav';
 import Quiz from '../components/Quiz';
 import { getQuestions } from '../data/moduleQuestions';
@@ -15,8 +13,6 @@ const Module1: React.FC = () => {
   const qs = getQuestions(1);
   return (
     <div className="min-h-screen bg-gray-50">
-  <Navbar />
-  <StockTicker />
       <ModNav moduleIndex={1} totalModules={10} title="Introduction to FundThesis" />
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <article className="bg-white rounded-xl shadow-lg overflow-hidden">
