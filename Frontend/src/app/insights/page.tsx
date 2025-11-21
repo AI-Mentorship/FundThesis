@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Navbar from "@/components/Navbar";
+import StockTicker from "@/components/StockTicker";
 import {
   TrendingUp,
   Star,
@@ -287,8 +289,11 @@ export default function InsightsPage() {
       : vol.toString();
 
   return (
-    <main className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Navbar />
+      <StockTicker />
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Stock Insights
@@ -301,9 +306,9 @@ export default function InsightsPage() {
           <BookmarkPlus className="w-5 h-5" />
           Add Stock
         </button>
-      </div>
+        </div>
 
-      <div className="grid grid-cols-4 gap-6">
+        <div className="grid grid-cols-4 gap-6">
         {/* Sidebar */}
         <div className="col-span-1 bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-4">
@@ -368,8 +373,8 @@ export default function InsightsPage() {
               </div>
             ))}
           </div>
-        </div>
-
+          </div>
+          
         {/* Main Content */}
         <div className="col-span-3 space-y-6">
           {loading ? (
@@ -435,8 +440,8 @@ export default function InsightsPage() {
                       </ul>
                     </div>
                   </div>
-                </div>
-
+          </div>
+          
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                   <div className="flex items-center gap-2 mb-4">
                     <Brain className="w-5 h-5 text-[#9DB38A]" />
@@ -467,9 +472,9 @@ export default function InsightsPage() {
                       <p className="text-sm text-gray-600">
                         Confidence:{" "}
                         {(stockInsight.sentiment.confidence * 100).toFixed(0)}%
-                      </p>
-                    </div>
-                  </div>
+            </p>
+          </div>
+        </div>
                 </div>
               </div>
 
@@ -527,7 +532,7 @@ export default function InsightsPage() {
                     <h3 className="text-lg font-bold">
                       Price Chart & AI Forecast
                     </h3>
-                  </div>
+    </div>
                   <div className="flex gap-2">
                     {(["1D", "1W", "1M", "3M", "1Y"] as Timeframe[]).map(
                       (tf) => (
@@ -708,8 +713,9 @@ export default function InsightsPage() {
               </div>
             </>
           ) : null}
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
