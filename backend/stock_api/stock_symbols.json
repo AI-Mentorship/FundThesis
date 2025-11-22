@@ -1,0 +1,24 @@
+{
+  "symbols": [
+    "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "NVDA", "META", "TSLA", "BRK.B", "UNH",
+    "XOM", "JNJ", "JPM", "V", "PG", "MA", "HD", "CVX", "ABBV", "LLY",
+    "MRK", "AVGO", "KO", "PEP", "COST", "ADBE", "TMO", "WMT", "MCD", "CSCO",
+    "ACN", "CRM", "ABT", "ORCL", "DHR", "VZ", "NKE", "CMCSA", "NEE", "DIS",
+    "TXN", "PM", "UPS", "BMY", "RTX", "HON", "QCOM", "INTC", "NFLX", "AMD",
+    "T", "AMGN", "LOW", "IBM", "BA", "CAT", "SPGI", "GE", "DE", "INTU",
+    "MDT", "AXP", "SBUX", "BLK", "ELV", "GILD", "LMT", "PFE", "NOW", "GS",
+    "TJX", "BKNG", "SYK", "MMC", "ADP", "MDLZ", "VRTX", "ADI", "AMT", "CI",
+    "ZTS", "ISRG", "REGN", "C", "MO", "PLD", "SCHW", "CB", "MS", "SO",
+    "DUK", "EOG", "BDX", "CVS", "ETN", "NOC", "BSX", "ITW", "HUM", "SLB",
+    "TGT", "USB", "MMM", "PNC", "LRCX", "WM", "CL", "MU", "KLAC", "FDX",
+    "EQIX", "AON", "GD", "NSC", "APD", "EW", "ICE", "SHW", "FCX", "MCO",
+    "CCI", "PSA", "EMR", "CME", "HCA", "DG", "MCK", "MAR", "AFL", "AJG",
+    "GM", "AIG", "TRV", "ADSK", "TT", "JCI", "ROP", "NXPI", "WMB", "PSX",
+    "OKE", "SNPS", "CDNS", "MPC", "AZO", "AEP", "BK", "O", "COR", "TEL",
+    "ROST", "APH", "PAYX", "MSCI", "KMB", "D", "CARR", "SRE", "ORLY", "TFC",
+    "HLT", "MSI", "WELL", "COF", "CMG", "ALL", "YUM", "CTAS", "A", "KMI",
+    "CTSH", "SPG", "GIS", "IQV", "HPQ", "MCHP", "DLR", "PRU", "KHC", "IDXX",
+    "EA", "DHI", "DD", "OTIS", "VRSK", "AME", "HSY", "XYL", "FAST", "DXCM",
+    "PCAR", "EXC", "PPG", "NEM", "GLW", "RSG", "DAL", "CHTR", "EXR", "MNST"
+  ]
+}

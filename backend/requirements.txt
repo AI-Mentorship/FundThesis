@@ -29,3 +29,14 @@ torch
 
 # Add Transformers library
 transformers
+
+# Libraries for RAG
+langchain-ollama==0.3.8
+ollama==0.6.0
+pydantic
+chromadb
+sentence_transformers
+PyMuPDF
+python-multipart
+dotenv
+pytest
