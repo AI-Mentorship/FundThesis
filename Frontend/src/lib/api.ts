@@ -13,6 +13,8 @@ export interface NewsArticle {
   full_text: string | null;
   tickers: string[];
   recommendation: 'Buy' | 'Hold' | 'Sell';
+  sentiment_label?: string;
+  sentiment_percentage?: number;
 }
 
 export interface NewsResponse {

@@ -113,7 +113,12 @@ export default function InsightsPage() {
           </div>
           
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">News Headlines</h3>
+            <div className="flex items-center gap-2 mb-4">
+              <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+              </svg>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent News & Sentiment</h3>
+            </div>
             
             {loading && (
               <div className="text-center py-8">
@@ -133,6 +138,14 @@ export default function InsightsPage() {
                 <p className="text-gray-600 dark:text-gray-400">
                   No recent news articles found.
                 </p>
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 max-w-2xl mx-auto mb-4">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200 font-semibold mb-2">
+                    ⚠️ Make sure the backend server is running:
+                  </p>
+                  <code className="block mt-2 text-xs bg-yellow-100 dark:bg-yellow-900 p-2 rounded text-yellow-900 dark:text-yellow-100">
+                    cd backend && source venv/bin/activate && uvicorn main:app --reload --port 8000
+                  </code>
+                </div>
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-2xl mx-auto">
                   <p className="text-sm text-blue-800 dark:text-blue-200">
                     <strong>To populate articles:</strong> Run the web scraper from the backend directory:
@@ -148,56 +161,60 @@ export default function InsightsPage() {
             )}
             
             {!loading && !error && articles.length > 0 && (
-              <div className="space-y-4">
-                {articles.map((article) => (
-                  <div
-                    key={article.id}
-                    onClick={() => handleArticleClick(article)}
-                    className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2 hover:text-blue-600 dark:hover:text-blue-400">
-                          {article.headline}
-                        </h4>
-                        {article.summary && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-2">
-                            {article.summary}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                          <span>{article.source}</span>
-                          <span>•</span>
-                          <span>{formatDate(article.published_at)}</span>
-                          {article.tickers.length > 0 && (
-                            <>
-                              <span>•</span>
-                              <div className="flex gap-1">
-                                {article.tickers.map((ticker) => (
-                                  <span
-                                    key={ticker}
-                                    className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded"
-                                  >
-                                    {ticker}
-                                  </span>
-                                ))}
-                              </div>
-                            </>
-                          )}
+              <div className="space-y-3">
+                {articles.map((article) => {
+                  const sentiment = article.sentiment_label || article.label || 'Neutral';
+                  const sentimentLower = sentiment.toLowerCase();
+                  const percentage = article.sentiment_percentage || 85;
+                  const isPositive = sentimentLower === 'positive';
+                  const isNegative = sentimentLower === 'negative';
+                  const dotColor = isPositive 
+                    ? 'bg-green-600' 
+                    : isNegative 
+                    ? 'bg-amber-700' 
+                    : 'bg-gray-500';
+                  const sentimentColor = isPositive 
+                    ? 'text-green-600 dark:text-green-500' 
+                    : isNegative 
+                    ? 'text-amber-700 dark:text-amber-500' 
+                    : 'text-gray-600 dark:text-gray-400';
+                  
+                  return (
+                    <div
+                      key={article.id}
+                      onClick={() => handleArticleClick(article)}
+                      className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors border border-gray-200 dark:border-gray-600"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-2 h-2 rounded-full mt-2.5 flex-shrink-0 ${dotColor}`}></div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-gray-900 dark:text-white mb-2 hover:text-blue-600 dark:hover:text-blue-400">
+                            {article.headline}
+                          </h4>
+                          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
+                            <span>{article.source}</span>
+                            <span>•</span>
+                            <span>{formatDate(article.published_at)}</span>
+                            <span>•</span>
+                            <span className={`font-medium ${sentimentColor}`}>
+                              {sentiment} ({percentage}%)
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Recommendation:</span>
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-xs font-semibold ${getRecommendationBadgeColor(
+                                article.recommendation
+                              )}`}
+                            >
+                              {article.recommendation}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${getRecommendationBadgeColor(
-                            article.recommendation
-                          )}`}
-                        >
-                          {article.recommendation}
-                        </span>
-                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

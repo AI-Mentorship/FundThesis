@@ -161,9 +161,21 @@ async def get_recent_news():
             # Generate recommendation
             recommendation = generate_recommendation(article)
             
-            # Add tickers and recommendation to article
+            # Calculate sentiment percentage (default to 85% if not available)
+            # The label field contains the sentiment (Positive/Negative/Neutral)
+            sentiment_label = article.get('label', '').capitalize() if article.get('label') else 'Neutral'
+            sentiment_score = article.get('sentiment_score')  # If stored in DB
+            if sentiment_score is not None:
+                sentiment_percentage = int(sentiment_score * 100)
+            else:
+                # Default confidence percentages based on label
+                sentiment_percentage = 85 if sentiment_label.lower() in ['positive', 'negative'] else 70
+            
+            # Add tickers, recommendation, and sentiment info to article
             article['tickers'] = tickers if tickers else []
             article['recommendation'] = recommendation
+            article['sentiment_label'] = sentiment_label
+            article['sentiment_percentage'] = sentiment_percentage
             
             # Include all financial articles
             articles_with_tickers.append(article)
@@ -209,8 +221,18 @@ async def get_article_detail(article_id: str):
         
         recommendation = generate_recommendation(article)
         
+        # Calculate sentiment percentage
+        sentiment_label = article.get('label', '').capitalize() if article.get('label') else 'Neutral'
+        sentiment_score = article.get('sentiment_score')
+        if sentiment_score is not None:
+            sentiment_percentage = int(sentiment_score * 100)
+        else:
+            sentiment_percentage = 85 if sentiment_label.lower() in ['positive', 'negative'] else 70
+        
         article['tickers'] = tickers
         article['recommendation'] = recommendation
+        article['sentiment_label'] = sentiment_label
+        article['sentiment_percentage'] = sentiment_percentage
         
         return article
         
@@ -294,8 +316,19 @@ async def get_articles_by_ticker(ticker: str, hours: int = 24, limit: int = 50):
             # Only include if the requested ticker is actually present
             if ticker in tickers or ticker.upper() in [t.upper() for t in tickers]:
                 recommendation = generate_recommendation(article)
+                
+                # Calculate sentiment percentage
+                sentiment_label = article.get('label', '').capitalize() if article.get('label') else 'Neutral'
+                sentiment_score = article.get('sentiment_score')
+                if sentiment_score is not None:
+                    sentiment_percentage = int(sentiment_score * 100)
+                else:
+                    sentiment_percentage = 85 if sentiment_label.lower() in ['positive', 'negative'] else 70
+                
                 article['tickers'] = tickers
                 article['recommendation'] = recommendation
+                article['sentiment_label'] = sentiment_label
+                article['sentiment_percentage'] = sentiment_percentage
                 articles_list.append(article)
         
         return {
