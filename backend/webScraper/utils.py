@@ -5,7 +5,7 @@ import time
 import sqlite3
 from urllib.parse import urlparse, urljoin
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from readability import Document
@@ -22,10 +22,39 @@ from readability import Document
 
 import finnhub
 
+#FinBERT setup
+# Use a pipeline as a high-level helper
+from transformers import pipeline
+pipe = pipeline("text-classification", model="ProsusAI/finbert")
+
+
+
 MIN_WORDS = 150
 
 load_dotenv()
 API_KEY = os.getenv("FINNHUB_KEY")
+
+# Common stock tickers for major exchanges (NYSE, NASDAQ)
+MAJOR_TICKERS = {
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK.B', 'V', 'JNJ',
+    'WMT', 'JPM', 'MA', 'PG', 'UNH', 'HD', 'DIS', 'BAC', 'VZ', 'ADBE', 'NFLX',
+    'PYPL', 'CMCSA', 'KO', 'PFE', 'NKE', 'INTC', 'T', 'CSCO', 'XOM', 'AVGO',
+    'COST', 'PEP', 'TMO', 'ABBV', 'MRK', 'CVX', 'WFC', 'ACN', 'DHR', 'MCD',
+    'NEE', 'LIN', 'BMY', 'QCOM', 'HON', 'AMGN', 'LOW', 'UPS', 'RTX', 'AMT',
+    'UBER', 'LYFT', 'SNAP', 'TWTR', 'SQ', 'SHOP', 'SPOT', 'ZM', 'DOCU', 'CRM',
+    'ORCL', 'IBM', 'AMD', 'MU', 'QRVO', 'LRCX', 'KLAC', 'AMAT', 'ASML', 'TSM'
+}
+
+# Extended list of common ticker patterns (1-5 letters)
+TICKER_PATTERN = re.compile(r'\b([A-Z]{1,5})\b')
+
+#SUPABASE setup
+from supabase import create_client, Client
+
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_SERVICE_ROLE = os.environ["SUPABASE_SERVICE_ROLE"]  # DO NOT expose this to frontend
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE)
+
 
 # ---------- HTTP session with headers & retries ----------
 def make_session():
@@ -57,47 +86,40 @@ def finn_client():
         raise RuntimeError("FINNHUB_KEY not set in env")
     return finnhub.Client(api_key=API_KEY)
 
-# ---------- Database ----------
-def setup_database(db_name: str):
-    global connection, cursor
-    BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # goes up from webscraper to backend
-    DB_PATH = os.path.join(BASE_DIR, "db", "NewsArticles.db")
+#Helper for converting epoch to timestamptz string
+def epoch_to_iso(epoch_val):
+    """Convert UNIX seconds -> ISO string with UTC tzinfo, or None."""
+    if epoch_val is None:
+        return None
+    try:
+        ts = int(epoch_val)
+        dt = datetime.fromtimestamp(ts, timezone.utc)
+        return dt.isoformat()
+    except Exception:
+        return None
 
-    connection = sqlite3.connect(DB_PATH)
-    cursor = connection.cursor()
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS articles(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        article_id INTEGER,
-        category TEXT,
-        datetime INTEGER,
-        headline TEXT,
-        related TEXT,
-        source TEXT,
-        summary TEXT,
-        full_text TEXT,
-        url TEXT,
-        inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-    cursor.execute("""
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_article_id
-    ON articles(article_id)
-    """)
-    # Optional aux columns for reliability/debug (ignore if they exist)
-    try:
-        cursor.execute("ALTER TABLE articles ADD COLUMN fetch_status TEXT")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        cursor.execute("ALTER TABLE articles ADD COLUMN fetch_error TEXT")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        cursor.execute("ALTER TABLE articles ADD COLUMN source_domain TEXT")
-    except sqlite3.OperationalError:
-        pass
-    connection.commit()
+
+def extract_tickers_from_text(text: str) -> list[str]:
+    """Extract potential stock tickers from text."""
+    if not text:
+        return []
+    
+    # Find all uppercase letter sequences (potential tickers)
+    potential_tickers = TICKER_PATTERN.findall(text.upper())
+    
+    # Filter to only known major tickers
+    found_tickers = [ticker for ticker in potential_tickers if ticker in MAJOR_TICKERS]
+    
+    # Also check if any tickers are mentioned explicitly in the text
+    text_upper = text.upper()
+    for ticker in MAJOR_TICKERS:
+        if ticker in text_upper and ticker not in found_tickers:
+            found_tickers.append(ticker)
+    
+    return list(set(found_tickers))  # Remove duplicates
+
+
+
 
 # ---------- Extractors ----------
 def extract_trafilatura(html: str) -> str | None:
@@ -229,82 +251,6 @@ def _fetch_html_following_better_url(url: str) -> tuple[str, str, int|None]:
 
     return final_url, html, status
 
-def _fetch_html_following_better_url(url: str) -> tuple[str, str, int|None]:
-    """
-    Returns (final_url, html, http_status). Tries AMP/canonical if they look better.
-    """
-    # 1) fetch original
-    status, html = fetch_html(url)
-    final_url = url
-    if not html:
-        return final_url, "", status
-
-    # 2) see if there is a better target (prefer AMP first; it’s usually static/full)
-    can_url, amp_url = _canonical_and_amp(html, final_url)
-
-    # Pick AMP if same domain and not obviously truncated aggregators
-    def _same_domain(u1, u2):
-        try:
-            return urlparse(u1).netloc.split(":")[0] == urlparse(u2).netloc.split(":")[0]
-        except Exception:
-            return False
-
-    candidate = None
-    if amp_url and (_same_domain(final_url, amp_url) or ("amp." in amp_url)):
-        candidate = amp_url
-    elif can_url:
-        candidate = can_url
-
-    if candidate and candidate != final_url:
-        st2, html2 = fetch_html(candidate)
-        if html2 and len(html2) > max(len(html)*0.6, 4000):  # crude heuristic: bigger page likely has full text
-            return candidate, html2, st2 or status
-
-    return final_url, html, status
-
-def get_fulltext(url: str) -> tuple[str|None, str|None, str|None, int|None, dict]:
-    """
-    Returns (text, status, error, http_status, meta)
-    status: 'ok' | 'empty' | 'blocked' | 'error' | 'short'
-    meta: dict with used_extractor, best_url, html_len
-    """
-    best_url, html, http_status = _fetch_html_following_better_url(url)
-    if not html:
-        return None, ('blocked' if (http_status and http_status in (401,403)) else 'error'), "no_html", http_status, {"best_url": best_url, "used_extractor": None, "html_len": 0}
-
-    html_len = len(html)
-
-    # Try extractors in order; require a reasonable length
-    for name, fn in [
-        ("trafilatura", _extract_trafilatura),
-        ("newspaper3k", lambda h: _extract_newspaper(best_url, h)),
-        ("readability", _extract_readability),
-        ("article-tag", _extract_article_tag),
-    ]:
-        try:
-            text = fn(html)
-            if text and len(text.split()) >= MIN_WORDS:
-                return text, "ok", None, http_status, {"best_url": best_url, "used_extractor": name, "html_len": html_len}
-            # If we got something but short, keep it as a candidate; try next method first
-            short_candidate = text
-        except Exception:
-            short_candidate = None
-        # keep trying next extractor
-
-    # If all methods “short”, return the longest short candidate
-    best = max(
-        [(_extract_trafilatura(html) or ""),
-         (_extract_newspaper(best_url, html) or ""),
-         (_extract_readability(html) or ""),
-         (_extract_article_tag(html) or "")],
-        key=lambda t: len(t)
-    )
-    if best:
-        status = "short" if len(best.split()) < MIN_WORDS else "ok"
-        return best, status, None, http_status, {"best_url": best_url, "used_extractor": "fallback-longest", "html_len": html_len}
-
-    return None, "empty", "extract_failed", http_status, {"best_url": best_url, "used_extractor": None, "html_len": html_len}
-
 def get_fulltext(url: str) -> tuple[str|None, str|None, str|None, int|None, dict]:
     """
     Returns (text, status, error, http_status, meta)
@@ -350,48 +296,132 @@ def get_fulltext(url: str) -> tuple[str|None, str|None, str|None, int|None, dict
 
 
 # ---------- Insert ----------
-def insert_intoDB(article_db: dict, text: str|None, status: str, error: str|None, http_status: int|None, meta: dict):
-    domain = None
+#Inserting articles into supabase
+def insert_into_supabase(article_db: dict,
+                         text: str | None,
+                         status: str,
+                         error: str | None,
+                         http_status: int | None,
+                         meta: dict):
+    """
+    article_db: generic "news item"
+    We'll gracefully handle different shapes (Finnhub, SEC, etc.)
+    """
+
+    # --- 1. Sentiment source ---
+    finb_input = (
+        article_db.get('summary')
+        or article_db.get('headline')
+        or ""
+    )
+    into_label = run_finbert(finb_input) if finb_input else None
+
+    # --- 2. Domain extraction ---
     try:
-        domain = urlparse(article_db['url']).netloc
+        domain = urlparse(article_db.get('url', '')).netloc or None
     except Exception:
-        pass
-    cursor.execute("""
-        INSERT OR IGNORE INTO articles
-        (article_id, category, datetime, headline, related, source, summary, full_text, url, fetch_status, fetch_error, source_domain)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        article_db.get('id'),
-        article_db.get('category'),
-        article_db.get('datetime'),
-        article_db.get('headline'),
-        article_db.get('related'),
-        article_db.get('source'),
-        article_db.get('summary'),
-        text,
-        meta.get("best_url") or article_db.get('url'),
-        f"{status}:{http_status}|{meta.get('used_extractor')}|html={meta.get('html_len')}",
-        error,
-        domain
-    ))
+        domain = None
+
+    # --- 3. Normalize published_at ---
+    published_raw = article_db.get('datetime')
+    published_iso = None
+
+    # Case 1: it's epoch-like (e.g. 1698432000)
+    if isinstance(published_raw, (int, float)) or (isinstance(published_raw, str) and published_raw.isdigit()):
+        published_iso = epoch_to_iso(published_raw)
+
+    # Case 2: it's already ISO-ish string like "2025-10-27T13:12:00+00:00" or "...Z"
+    elif isinstance(published_raw, str):
+        try:
+            dt = datetime.fromisoformat(published_raw.replace("Z", "+00:00"))
+            published_iso = dt.astimezone(timezone.utc).isoformat()
+        except Exception:
+            published_iso = None
+
+    # --- 4. Extract tickers from article content ---
+    headline = article_db.get('headline', '') or ''
+    summary = article_db.get('summary', '') or ''
+    full_text_snippet = (text[:500] if text else '') or ''
+    combined_text = f"{headline} {summary} {full_text_snippet}"
+    tickers = extract_tickers_from_text(combined_text)
+    
+    # Convert tickers list to comma-separated string for storage
+    tickers_str = ','.join(tickers) if tickers else None
+
+    # --- 5. Build payload base ---
+    payload = {
+        "category": article_db.get('category'),
+        "published_at": published_iso,
+        "headline": article_db.get('headline'),
+        "related": article_db.get('related'),
+        "source": article_db.get('source'),
+        "summary": article_db.get('summary'),
+        "full_text": text,
+        "url": meta.get("best_url") or article_db.get('url'),
+        "label": into_label,
+        "inserted_at": datetime.now(timezone.utc).isoformat(),
+        "fetch_status": f"{status}:{http_status}|{meta.get('used_extractor')}|html={meta.get('html_len')}",
+        "fetch_error": error,
+        "source_domain": domain,
+        "tickers": tickers_str  # Add extracted tickers as comma-separated string
+    }
+
+    # --- 5. ONLY add sqlite_id/article_id if they look numeric ---
+    art_id = article_db.get('id')
+    if isinstance(art_id, (int, float)) or (isinstance(art_id, str) and art_id.isdigit()):
+        payload["sqlite_id"] = art_id
+        payload["article_id"] = art_id
+    # else: skip those fields so Postgres doesn't try to coerce
+
+    # --- 6. Upsert ---
+    res = supabase.table("articles").upsert(payload, on_conflict="url").execute()
+    return res
 
 
 # ---------- Pipeline ----------
-def articleToDB(db_name: str = "fundthesis"):
-    setup_database(db_name)
+def articleToSupabase():
     finc = finn_client()
     news = finc.general_news('general', min_id=0)
 
     inserted = 0
     for art in news:
+        # get article body by scraping the URL
         text, status, error, http_status, meta = get_fulltext(art['url'])
-        insert_intoDB(art, text, status, error, http_status, meta)
+
+        # push 1 row into Supabase
+        insert_into_supabase(
+            article_db=art,
+            text=text,
+            status=status,
+            error=error,
+            http_status=http_status,
+            meta=meta
+        )
+
         inserted += 1
-    connection.commit()
-    print(f"Inserted {inserted} articles")
+
+    print(f"Inserted {inserted} articles into Supabase")
+
+
+#-------------FinBert-------------
+def run_finbert(summ_of_article):
+    result = pipe(summ_of_article)
+    label = result[0]['label']
+    return label
 
 
 def quick_dbcheck():
-    cursor.execute("SELECT COUNT(*), SUM(CASE WHEN full_text IS NULL OR TRIM(full_text)='' THEN 1 ELSE 0 END) FROM articles")
-    total, empties = cursor.fetchone()
-    print(f"Total rows: {total} | Empty full_text: {empties}")
+    # total rows
+    total_res = supabase.table("articles").select("id").execute()
+    total_rows = len(total_res.data)
+
+    # rows with missing/blank full_text
+    empty_res = supabase.table("articles") \
+        .select("id, full_text") \
+        .or_("full_text.is.null,full_text.eq.") \
+        .execute()
+    empty_rows = len(empty_res.data)
+
+    print(f"Total rows in Supabase: {total_rows} | Empty full_text: {empty_rows}")
+
+
