@@ -49,7 +49,8 @@ export default function StockTradeModal({ stock, onClose, timeframe, setTimefram
 
   const execute = () => {
     setError(null)
-    const qty = Math.floor(quantity)
+    // Allow fractional shares - use the exact quantity entered
+    const qty = quantity
     if (qty <= 0) {
       setError('Enter a quantity greater than zero')
       return
@@ -155,7 +156,7 @@ export default function StockTradeModal({ stock, onClose, timeframe, setTimefram
                 <p className="text-sm text-gray-600">Cash balance</p>
                 <p className="text-2xl font-bold">${cashBalance.toFixed(2)}</p>
                 <p className="text-sm text-gray-600 mt-3">Your holdings</p>
-                <p className="text-xl font-medium">{holdings} shares</p>
+                <p className="text-xl font-medium">{holdings.toFixed(4)} shares</p>
                 <div className="mt-4 w-full text-center">
                   <p className="text-sm text-gray-500">Portfolio Value</p>
                   <p className="text-lg font-semibold">${(holdings * stock.price + cashBalance).toFixed(2)}</p>
@@ -172,7 +173,18 @@ export default function StockTradeModal({ stock, onClose, timeframe, setTimefram
                   </div>
 
                   <div className="mt-4 flex flex-col items-center w-full">
-                    <input type="number" value={quantity === 0 ? '' : quantity} onChange={(e) => setQuantity(Number(e.target.value))} placeholder="Quantity" className="w-40 border rounded px-3 py-2 text-center" />
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      min="0"
+                      value={quantity === 0 ? '' : quantity} 
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? 0 : Number(e.target.value)
+                        setQuantity(val >= 0 ? val : 0)
+                      }} 
+                      placeholder="Quantity" 
+                      className="w-40 border rounded px-3 py-2 text-center" 
+                    />
 
                     <div className="text-sm text-gray-600 mt-2 text-center">Price: <span className="font-medium">${stock.price.toFixed(2)}</span></div>
                     <div className="text-sm text-gray-600 mt-1 text-center">Total: <span className="font-medium">${(quantity * stock.price).toFixed(2)}</span></div>
