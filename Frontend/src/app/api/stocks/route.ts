@@ -61,7 +61,8 @@ function extractPriceFromPoint(point: unknown): number | null {
   }
 
   const record = point as Record<string, unknown>;
-  const candidateKeys = ['price', 'close', 'closing_price', 'value', 'adjClose', 'adj_close'];
+  // Include both lowercase and uppercase variants to handle different data formats
+  const candidateKeys = ['price', 'Price', 'close', 'Close', 'closing_price', 'value', 'adjClose', 'adj_close', 'AdjClose'];
   for (const key of candidateKeys) {
     const value = record[key];
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -90,9 +91,10 @@ function normalisePriceSeries(series: unknown): PriceSeriesPoint[] {
         return null;
       }
 
+      // Handle both lowercase 'date' and uppercase 'Date' keys
       const rawDate =
         point && typeof point === 'object'
-          ? ((point as Record<string, unknown>).date ?? null)
+          ? ((point as Record<string, unknown>).date ?? (point as Record<string, unknown>).Date ?? null)
           : null;
       const dateValue = rawDate ? new Date(rawDate as string | number | Date) : null;
 
@@ -212,9 +214,16 @@ function buildSummaryFromSeries(row: StockPriceSeriesRow): StockSummary | null {
 
 async function fetchYahooSummary(symbol: string): Promise<StockSummary | null> {
   try {
+    console.log(`🌐 Fetching Yahoo quote for ${symbol}...`);
     const quote = await yahooFinance.quote(symbol);
 
-    if (!quote || quote.regularMarketPrice === undefined) {
+    if (!quote) {
+      console.log(`⚠️ No quote returned for ${symbol}`);
+      return null;
+    }
+    
+    if (quote.regularMarketPrice === undefined) {
+      console.log(`⚠️ No regularMarketPrice for ${symbol}, quote:`, JSON.stringify(quote).slice(0, 200));
       return null;
     }
 
@@ -228,6 +237,8 @@ async function fetchYahooSummary(symbol: string): Promise<StockSummary | null> {
         ? quote.longName
         : quote.shortName) || `${symbol} Inc.`;
 
+    console.log(`✅ Yahoo quote for ${symbol}: $${currentPrice} (${companyName})`);
+
     return {
       symbol,
       company: companyName,
@@ -237,7 +248,7 @@ async function fetchYahooSummary(symbol: string): Promise<StockSummary | null> {
       forecastData: [],
     };
   } catch (error) {
-    console.error(`Error fetching ${symbol} from Yahoo Finance:`, error);
+    console.error(`❌ Error fetching ${symbol} from Yahoo Finance:`, error);
     return null;
   }
 }
@@ -249,6 +260,8 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0', 10);
     const symbolsParam = searchParams.get('symbols');
 
+    console.log(`📥 Received symbols param: "${symbolsParam}"`);
+
     const customSymbols = symbolsParam
       ? Array.from(
           new Set(
@@ -259,6 +272,8 @@ export async function GET(request: NextRequest) {
           ),
         )
       : null;
+    
+    console.log(`📥 Parsed custom symbols: ${customSymbols ? customSymbols.join(', ') : 'none'}`);
 
     const paginatedSymbols =
       customSymbols && customSymbols.length > 0
@@ -304,24 +319,12 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    const missingSymbols = paginatedSymbols.filter(
-      (symbol) => !cachedMap.has(symbol.toUpperCase()),
-    );
+    console.log(`📊 Cached rows found: ${cachedMap.size} for symbols: ${paginatedSymbols.join(', ')}`);
 
-    const yahooSummaries = await Promise.all(
-      missingSymbols.map((symbol) => fetchYahooSummary(symbol)),
-    );
-    const yahooMap = new Map<string, StockSummary>();
-  yahooSummaries.forEach((summary) => {
-    if (summary) {
-      yahooMap.set(summary.symbol.toUpperCase(), {
-        ...summary,
-        forecastData: [],
-      });
-    }
-  });
-
+    // First, try to build summaries from cached data
     const stocks: StockSummary[] = [];
+    const symbolsNeedingYahoo: string[] = [];
+
     paginatedSymbols.forEach((symbol) => {
       const upperSymbol = symbol.toUpperCase();
       const cachedRow = cachedMap.get(upperSymbol);
@@ -332,16 +335,36 @@ export async function GET(request: NextRequest) {
           symbol: upperSymbol,
         });
         if (summary) {
+          console.log(`✅ Built summary from cache for ${upperSymbol}`);
           stocks.push(summary);
           return;
+        } else {
+          console.log(`⚠️ Failed to build summary from cache for ${upperSymbol}, will try Yahoo`);
         }
       }
+      
+      // Need to fetch from Yahoo
+      symbolsNeedingYahoo.push(upperSymbol);
+    });
 
-      const yahooSummary = yahooMap.get(upperSymbol);
-      if (yahooSummary) {
-        stocks.push(yahooSummary);
+    console.log(`🌐 Fetching ${symbolsNeedingYahoo.length} symbols from Yahoo: ${symbolsNeedingYahoo.join(', ')}`);
+
+    // Fetch missing symbols from Yahoo Finance
+    const yahooSummaries = await Promise.all(
+      symbolsNeedingYahoo.map((symbol) => fetchYahooSummary(symbol)),
+    );
+
+    yahooSummaries.forEach((summary) => {
+      if (summary) {
+        console.log(`✅ Got Yahoo data for ${summary.symbol}`);
+        stocks.push({
+          ...summary,
+          forecastData: [],
+        });
       }
     });
+
+    console.log(`📈 Total stocks to return: ${stocks.length}`);
 
     return NextResponse.json({
       stocks,

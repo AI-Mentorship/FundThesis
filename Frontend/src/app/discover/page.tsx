@@ -518,7 +518,9 @@ function DiscoverPage() {
         console.log("🎯 User tickers extracted:", userTickers);
 
         if (userTickers.length > 0) {
-          const symbolsParam = encodeURIComponent(userTickers.join(","));
+          // Join tickers with comma - no need to encodeURIComponent as fetch handles this
+          const symbolsParam = (userTickers as string[]).join(",");
+          console.log("🔗 Fetching stocks with symbols:", symbolsParam);
           const stocksResponse = await fetch(
             `/api/stocks?symbols=${symbolsParam}`,
             {
