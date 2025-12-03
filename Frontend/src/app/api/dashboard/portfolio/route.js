@@ -54,11 +54,15 @@ export async function GET() {
     const histories = await loadHistories(supabase, tickers);
     const performance = computePortfolioPerformance(histories);
     const summary = buildSummary(performance);
+    
+    // Build per-ticker stock data with current prices and changes
+    const stockData = buildStockData(histories);
 
     return NextResponse.json({
       tickers,
       performance,
       summary,
+      stockData,
     });
   } catch (error) {
     console.error('Unexpected error loading portfolio performance:', error);
@@ -392,6 +396,42 @@ function buildSummary(performance) {
     weeklyChange,
     monthlyChange,
   };
+}
+
+function buildStockData(histories) {
+  const stockData = {};
+
+  Object.entries(histories).forEach(([ticker, rows]) => {
+    if (!rows || rows.length === 0) {
+      stockData[ticker] = {
+        symbol: ticker,
+        price: 0,
+        change: 0,
+        changePercent: 0,
+      };
+      return;
+    }
+
+    // Sort by date to ensure we have the latest data
+    const sortedRows = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+    
+    const latestRow = sortedRows[sortedRows.length - 1];
+    const previousRow = sortedRows.length > 1 ? sortedRows[sortedRows.length - 2] : latestRow;
+
+    const currentPrice = latestRow.close;
+    const previousPrice = previousRow.close;
+    const change = currentPrice - previousPrice;
+    const changePercent = previousPrice !== 0 ? (change / previousPrice) * 100 : 0;
+
+    stockData[ticker] = {
+      symbol: ticker,
+      price: Math.round(currentPrice * 100) / 100,
+      change: Math.round(change * 100) / 100,
+      changePercent: Math.round(changePercent * 100) / 100,
+    };
+  });
+
+  return stockData;
 }
 
 function deltaFromOffset(performance, offset) {

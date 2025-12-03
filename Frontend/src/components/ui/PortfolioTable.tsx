@@ -4,7 +4,6 @@ interface Holding {
   symbol: string
   shares: number
   price: string
-  value: string
   gainLoss: string
   isPositive: boolean
 }
@@ -35,10 +34,7 @@ export function PortfolioTable({ holdings, className = "" }: PortfolioTableProps
                 Price
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Value
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Gain/Loss
+                Change
               </th>
             </tr>
           </thead>
@@ -54,10 +50,7 @@ export function PortfolioTable({ holdings, className = "" }: PortfolioTableProps
                 <td className="px-6 py-4 whitespace-nowrap text-gray-600">
                   {holding.price}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-900">
-                  {holding.value}
-                </td>
-                <td className={`px-6 py-4 whitespace-nowrap ${holding.isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                <td className={`px-6 py-4 whitespace-nowrap font-medium ${holding.isPositive ? 'text-green-600' : 'text-red-600'}`}>
                   {holding.gainLoss}
                 </td>
               </tr>

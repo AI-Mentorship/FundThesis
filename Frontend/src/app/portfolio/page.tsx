@@ -18,7 +18,6 @@ type HoldingRow = {
   symbol: string;
   shares: number;
   price: string;
-  value: string;
   gainLoss: string;
   isPositive: boolean;
 };
@@ -31,19 +30,26 @@ type StockQuoteResponse = {
   changePercent: number;
 };
 
+type StockData = {
+  [symbol: string]: {
+    symbol: string;
+    price: number;
+    change: number;
+    changePercent: number;
+  };
+};
+
 function formatCurrency(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
-function formatGainLoss(change: number, changePercent: number): {
+function formatGainLoss(changePercent: number): {
   text: string;
   isPositive: boolean;
 } {
-  const isPositive = change >= 0;
+  const isPositive = changePercent >= 0;
   const sign = isPositive ? "+" : "";
-  const text = `${sign}${change.toFixed(2)} (${sign}${changePercent.toFixed(
-    2
-  )}%)`;
+  const text = `${sign}${changePercent.toFixed(2)}%`;
 
   return { text, isPositive };
 }
@@ -138,36 +144,33 @@ export default function PortfolioPage() {
         return;
       }
 
-      const summary =
-        payload && typeof payload.summary === "object" ? payload.summary : null;
+      // Get per-ticker stock data from the API response
+      const stockData: StockData =
+        payload && typeof payload.stockData === "object" && payload.stockData
+          ? payload.stockData
+          : {};
 
-      if (
-        !summary ||
-        typeof summary.latestValue !== "number" ||
-        Number.isNaN(summary.latestValue)
-      ) {
-        setTickers(fetchedTickers);
-        setHoldings([]);
-        setHoldingsError("Portfolio summary data is not available yet.");
-        return;
-      }
-
-      const price = summary.latestValue;
-      const change =
-        typeof summary.dailyChange === "number" ? summary.dailyChange : 0;
-      const changePercent =
-        typeof summary.dailyChangePercent === "number"
-          ? summary.dailyChangePercent
-          : 0;
-
+      // Build holdings from individual stock data
       const derivedHoldings: HoldingRow[] = fetchedTickers.map((symbol) => {
-        const { text, isPositive } = formatGainLoss(change, changePercent);
+        const stock = stockData[symbol];
+        
+        if (!stock || typeof stock.price !== "number" || stock.price === 0) {
+          // Fallback if no stock data available
+          return {
+            symbol,
+            shares: 1,
+            price: "—",
+            gainLoss: "—",
+            isPositive: true,
+          };
+        }
+
+        const { text, isPositive } = formatGainLoss(stock.changePercent);
 
         return {
           symbol,
           shares: 1,
-          price: formatCurrency(price),
-          value: formatCurrency(price),
+          price: formatCurrency(stock.price),
           gainLoss: text,
           isPositive,
         };
