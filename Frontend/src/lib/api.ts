@@ -22,6 +22,23 @@ export interface NewsResponse {
   count: number;
 }
 
+// Type for raw article data from API responses
+interface RawArticle {
+  id?: string;
+  headline?: string | null;
+  summary?: string | null;
+  published_at?: string | null;
+  url?: string;
+  source?: string | null;
+  label?: string | null;
+  related?: string | null;
+  full_text?: string | null;
+  tickers?: string | string[] | null;
+  recommendation?: 'Buy' | 'Hold' | 'Sell';
+  inserted_at?: string;
+  [key: string]: unknown;
+}
+
 export async function fetchRecentNews(): Promise<NewsResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/news/recent`, {
@@ -46,13 +63,13 @@ export async function fetchRecentNews(): Promise<NewsResponse> {
     }
 
     // Ensure each article has required fields with defaults
-    const normalizedArticles = data.articles.map((article: any) => ({
+    const normalizedArticles = (data.articles as RawArticle[]).map((article) => ({
       ...article,
-      tickers: article.tickers || [],
+      tickers: Array.isArray(article.tickers) ? article.tickers : (article.tickers ? [article.tickers] : []),
       recommendation: article.recommendation || 'Hold',
       summary: article.summary || '',
       full_text: article.full_text || null,
-    }));
+    })) as NewsArticle[];
 
     return {
       articles: normalizedArticles,
@@ -123,7 +140,7 @@ export async function fetchArticlesFromSupabase(params?: {
     const data = await response.json();
     
     // Transform Supabase articles to match NewsArticle interface
-    const normalizedArticles: NewsArticle[] = (data.articles || []).map((article: any) => {
+    const normalizedArticles: NewsArticle[] = ((data.articles || []) as RawArticle[]).map((article) => {
       // Parse tickers from text to array
       let tickersArray: string[] = [];
       if (article.tickers) {
@@ -159,20 +176,20 @@ export async function fetchArticlesFromSupabase(params?: {
       }
 
       return {
-        id: article.id,
+        id: article.id || `article-${Date.now()}-${Math.random()}`,
         headline: article.headline || 'No headline',
         summary: article.summary || '',
         published_at: article.published_at || article.inserted_at || new Date().toISOString(),
         url: article.url || '#',
         source: article.source || 'Unknown',
-        label: article.label,
-        related: article.related,
-        full_text: article.full_text,
+        label: article.label || null,
+        related: article.related || null,
+        full_text: article.full_text || null,
         tickers: tickersArray,
         recommendation,
         sentiment_label: sentimentLabel,
         sentiment_percentage: label === 'positive' ? 75 : label === 'negative' ? 75 : 50,
-      };
+      } as NewsArticle;
     });
 
     return {

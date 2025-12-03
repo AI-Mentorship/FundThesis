@@ -90,7 +90,11 @@ const normaliseSummaryForecast = (points: unknown): StockDetailPoint[] => {
       const record = entry as Record<string, unknown>;
       const rawDate = record.date ?? record.Date;
       const rawPrice =
-        record.price ?? record.Price ?? record.value ?? record.Predicted_Close ?? record.prediction;
+        record.price ??
+        record.Price ??
+        record.value ??
+        record.Predicted_Close ??
+        record.prediction;
 
       if (typeof rawDate !== "string" || rawDate.trim().length === 0) {
         return null;
@@ -156,7 +160,7 @@ const mapApiStockSummary = (stock: unknown): Stock | null => {
 
 const createPlaceholderDetail = (
   stock: Stock,
-  forecastPoints: StockDetailPoint[] = [],
+  forecastPoints: StockDetailPoint[] = []
 ): StockDetail => ({
   symbol: stock.symbol,
   company: stock.company,
@@ -201,7 +205,8 @@ function DiscoverPage() {
   const applyForecastToDetails = useCallback(
     (incomingStocks: Stock[], { reset = false }: { reset?: boolean } = {}) => {
       const entries = incomingStocks.filter(
-        (stock) => Array.isArray(stock.forecastData) && stock.forecastData.length > 0,
+        (stock) =>
+          Array.isArray(stock.forecastData) && stock.forecastData.length > 0
       );
 
       if (reset && entries.length === 0) {
@@ -236,7 +241,7 @@ function DiscoverPage() {
         return next;
       });
     },
-    [],
+    []
   );
 
   // Filter stocks based on search query
@@ -264,7 +269,9 @@ function DiscoverPage() {
     async (symbol: string, tf: "day" | "month" | "year") => {
       const normalisedSymbol = symbol.trim().toUpperCase();
       const days = getDaysForTimeframe(tf);
-      console.log(`📡 Fetching details for ${normalisedSymbol} (${days} days)...`);
+      console.log(
+        `📡 Fetching details for ${normalisedSymbol} (${days} days)...`
+      );
       const res = await fetch(`/api/stock/${normalisedSymbol}?days=${days}`, {
         method: "GET",
         credentials: "include",
@@ -343,9 +350,10 @@ function DiscoverPage() {
   }, [timeframe]);
 
   const fetchDefaultStocks = useCallback(
-    async (
-      { reset = false, mode = "more" as const }: { reset?: boolean; mode?: "initial" | "more" } = {}
-    ) => {
+    async ({
+      reset = false,
+      mode = "more" as const,
+    }: { reset?: boolean; mode?: "initial" | "more" } = {}) => {
       const showInitialLoading = mode === "initial";
       const offset = reset ? 0 : defaultOffsetRef.current;
 
@@ -463,7 +471,8 @@ function DiscoverPage() {
           };
 
           const filtered = prev.filter(
-            (stock) => stock.symbol.toUpperCase() !== detail.symbol.toUpperCase()
+            (stock) =>
+              stock.symbol.toUpperCase() !== detail.symbol.toUpperCase()
           );
 
           return [summary, ...filtered];
@@ -508,7 +517,9 @@ function DiscoverPage() {
               new Set(
                 payload.tickers
                   .map((ticker: unknown) =>
-                    typeof ticker === "string" ? ticker.trim().toUpperCase() : ""
+                    typeof ticker === "string"
+                      ? ticker.trim().toUpperCase()
+                      : ""
                   )
                   .filter((ticker: string) => ticker.length > 0)
               )
@@ -533,7 +544,9 @@ function DiscoverPage() {
             const mapped: Stock[] = Array.isArray(data.stocks)
               ? data.stocks
                   .map((stock: unknown) => mapApiStockSummary(stock))
-                  .filter((stock: Stock | null): stock is Stock => stock !== null)
+                  .filter(
+                    (stock: Stock | null): stock is Stock => stock !== null
+                  )
               : [];
 
             console.log("✅ Mapped stocks for cards:", mapped);
@@ -549,7 +562,11 @@ function DiscoverPage() {
               await fetchStockDetail(mapped[0].symbol, timeframeRef.current);
             }
           } else {
-            console.error("❌ Stocks API failed:", stocksResponse.status, await stocksResponse.text());
+            console.error(
+              "❌ Stocks API failed:",
+              stocksResponse.status,
+              await stocksResponse.text()
+            );
           }
         }
       }
@@ -585,8 +602,14 @@ function DiscoverPage() {
         <p className="text-lg text-gray-600 mb-2">
           Explore trending stocks with our interactive card viewer
         </p>
-        <div className="flex items-center justify-center py-20 text-gray-600">
-          Loading stocks...
+        <div className="flex flex-col items-center justify-center py-20 text-gray-600">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mb-4"></div>
+          <p className="text-xl font-medium text-gray-700 mb-2">
+            Loading stocks...
+          </p>
+          <p className="text-sm text-gray-500">
+            Fetching market data and forecasts
+          </p>
         </div>
       </main>
     );

@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { NewsArticle } from '@/lib/api';
+import React from "react";
+import { NewsArticle } from "@/lib/api";
 
 interface NewsArticleModalProps {
   article: NewsArticle | null;
@@ -9,31 +9,72 @@ interface NewsArticleModalProps {
   onClose: () => void;
 }
 
-export default function NewsArticleModal({ article, isOpen, onClose }: NewsArticleModalProps) {
+export default function NewsArticleModal({
+  article,
+  isOpen,
+  onClose,
+}: NewsArticleModalProps) {
+  // Wrapper to ensure scroll is restored when closing
+  const handleClose = React.useCallback(() => {
+    document.body.style.removeProperty("overflow");
+    onClose();
+  }, [onClose]);
+
+  // Close modal on Escape key and manage body scroll
+  React.useEffect(() => {
+    if (!isOpen) {
+      // Ensure scroll is restored when modal is closed
+      document.body.style.removeProperty("overflow");
+      return;
+    }
+
+    // Store the original overflow value before changing it
+    const originalOverflow = document.body.style.overflow || "";
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    document.body.style.overflow = "hidden"; // Prevent background scrolling
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      // Always restore scroll when effect cleans up - remove the style property
+      if (originalOverflow) {
+        document.body.style.overflow = originalOverflow;
+      } else {
+        document.body.style.removeProperty("overflow");
+      }
+    };
+  }, [isOpen, handleClose]);
+
   if (!isOpen || !article) return null;
 
   const getRecommendationColor = (recommendation: string) => {
     switch (recommendation) {
-      case 'Buy':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'Sell':
-        return 'bg-red-100 text-red-800 border-red-300';
-      case 'Hold':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case "Buy":
+        return "bg-green-100 text-green-800 border-green-300";
+      case "Sell":
+        return "bg-red-100 text-red-800 border-red-300";
+      case "Hold":
+        return "bg-yellow-100 text-yellow-800 border-yellow-300";
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
+        return "bg-gray-100 text-gray-800 border-gray-300";
     }
   };
 
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
       });
     } catch {
       return dateString;
@@ -43,45 +84,26 @@ export default function NewsArticleModal({ article, isOpen, onClose }: NewsArtic
   // Close modal when clicking outside
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
-      onClose();
+      handleClose();
     }
   };
 
-  // Close modal on Escape key
-  React.useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden'; // Prevent background scrolling
-    }
-    
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen, onClose]);
-
   return (
-    <div 
+    <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm"
       onClick={handleBackdropClick}
     >
-      <div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+      <div
+        className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex justify-between items-start">
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-start">
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
               {article.headline}
             </h2>
-            <div className="flex flex-wrap gap-2 items-center text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex flex-wrap gap-2 items-center text-sm text-gray-600">
               <span>{article.source}</span>
               <span>•</span>
               <span>{formatDate(article.published_at)}</span>
@@ -92,7 +114,7 @@ export default function NewsArticleModal({ article, isOpen, onClose }: NewsArtic
                     {article.tickers.map((ticker) => (
                       <span
                         key={ticker}
-                        className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs font-medium"
+                        className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium"
                       >
                         {ticker}
                       </span>
@@ -103,8 +125,8 @@ export default function NewsArticleModal({ article, isOpen, onClose }: NewsArtic
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="ml-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            onClick={handleClose}
+            className="ml-4 text-gray-400 hover:text-gray-600"
             aria-label="Close"
           >
             <svg
@@ -128,22 +150,20 @@ export default function NewsArticleModal({ article, isOpen, onClose }: NewsArtic
           {/* Summary */}
           {article.summary && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Summary
               </h3>
-              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                {article.summary}
-              </p>
+              <p className="text-gray-700 leading-relaxed">{article.summary}</p>
             </div>
           )}
 
           {/* Full Text */}
           {article.full_text && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Full Article
               </h3>
-              <p className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+              <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
                 {article.full_text.length > 2000
                   ? `${article.full_text.substring(0, 2000)}...`
                   : article.full_text}
@@ -152,13 +172,13 @@ export default function NewsArticleModal({ article, isOpen, onClose }: NewsArtic
           )}
 
           {/* Recommendation */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+          <div className="border-t border-gray-200 pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   Actionable Recommendation
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-600">
                   Based on sentiment analysis and article content
                 </p>
               </div>
@@ -174,12 +194,12 @@ export default function NewsArticleModal({ article, isOpen, onClose }: NewsArtic
 
           {/* External Link */}
           {article.url && (
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+            <div className="border-t border-gray-200 pt-6">
               <a
                 href={article.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+                className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium"
               >
                 Read full article
                 <svg
@@ -203,4 +223,3 @@ export default function NewsArticleModal({ article, isOpen, onClose }: NewsArtic
     </div>
   );
 }
-

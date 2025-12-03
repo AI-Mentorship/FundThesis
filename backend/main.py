@@ -25,6 +25,13 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(news_router)
 
+# Try to include insights routes if available
+try:
+    from app.insights_routes import router as insights_router
+    app.include_router(insights_router)
+except ImportError:
+    print("Warning: insights_routes not available. LangChain features may not work.")
+
 
 '''
 assuming current DB structure:
